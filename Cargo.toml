@@ -1,0 +1,11 @@
+[package]
+name = "rust-template"
+version = "0.0.0"
+authors = ["Matthew James Briggs <matthew.james.briggs@gmail.com>"]
+edition = "2018"
+exclude = ["tests/", ".gitignore"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+[dependencies]
+anyhow = "1"

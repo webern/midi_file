@@ -1,0 +1,25 @@
+name: ci workflow
+on:
+  push:
+    branches: [ 'main', "*develop*" ]
+  pull_request:
+    branches: [ '*' ]
+jobs:
+  ci-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup update stable && cargo --version
+      - run: make ci
+  ci-macos:
+    runs-on: macOS-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup update stable && cargo --version
+      - run: make ci
+  ci-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup update stable && cargo --version
+      - run: make ci
