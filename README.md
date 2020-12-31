@@ -1,3 +1,3 @@
-# Rust Template
+# Rust MIDI File
 
-This is a template for starting a new rust project.
+This is a lib for reading and writing MIDI files using Rust.

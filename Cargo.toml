@@ -1,5 +1,5 @@
 [package]
-name = "rust-template"
+name = "midi"
 version = "0.0.0"
 authors = ["Matthew James Briggs <matthew.james.briggs@gmail.com>"]
 edition = "2018"
@@ -8,4 +8,9 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-anyhow = "1"
+log = "0.4"
+snafu = "0.6"
+
+[dev-dependencies]
+chrono = "0.4"
+env_logger = "0.8"
