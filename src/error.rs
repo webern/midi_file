@@ -1,4 +1,6 @@
 use snafu::Snafu;
+use std::num::TryFromIntError;
+use std::path::PathBuf;
 
 /// The public Error type for this library.
 #[derive(Debug, Snafu)]
@@ -14,10 +16,11 @@ pub(crate) type LibResult<T> = std::result::Result<T, LibError>;
 #[derive(Debug, Snafu)]
 #[snafu(visibility = "pub(crate)")]
 pub(crate) enum LibError {
-    #[snafu(display("Error while reading bytes: {}", source))]
-    Io {
+    #[snafu(display("{} Error creating file '{}': {}", site, path.display(), source))]
+    Create {
         site: String,
-        source: crate::byte_iter::ByteError,
+        path: PathBuf,
+        source: std::io::Error,
     },
 
     #[snafu(display("{}: The MIDI file is invalid: {}", site, description))]
@@ -25,6 +28,36 @@ pub(crate) enum LibError {
 
     #[snafu(display("{} unknown error", site))]
     Other { site: String },
+
+    #[snafu(display("{} Error while reading data: {}", site, source))]
+    Read {
+        site: String,
+        source: crate::byte_iter::ByteError,
+    },
+
+    #[snafu(display("{} The string is too long and overflows a u32: {}", site, source))]
+    StringTooLong {
+        site: String,
+        source: TryFromIntError,
+    },
+
+    #[snafu(display("{} There are too many tracks for a 16-byte uint: {}", site, source))]
+    TooManyTracks {
+        site: String,
+        source: TryFromIntError,
+    },
+
+    #[snafu(display("{} The track is too long and overflows a u32: {}", site, source))]
+    TrackTooLong {
+        site: String,
+        source: TryFromIntError,
+    },
+
+    #[snafu(display("{} Error while writing data: {}", site, source))]
+    Write {
+        site: String,
+        source: std::io::Error,
+    },
 }
 
 macro_rules! site {
@@ -35,7 +68,13 @@ macro_rules! site {
 
 macro_rules! io {
     () => {
-        crate::error::Io { site: site!() }
+        crate::error::Read { site: site!() }
+    };
+}
+
+macro_rules! wr {
+    () => {
+        crate::error::Write { site: site!() }
     };
 }
 

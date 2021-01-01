@@ -21,6 +21,6 @@ fn logger_init() {
                 record.args()
             )
         })
-        .filter(None, LevelFilter::Trace)
+        .filter(None, LevelFilter::Error)
         .init();
 }

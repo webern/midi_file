@@ -1,10 +1,89 @@
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
+
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub(crate) struct Vlq {
+    bytes: u32,
+}
+
+impl Vlq {
+    pub(crate) fn new(value: u32) -> Self {
+        Self { bytes: value }
+    }
+
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        encode_u32(self.bytes)
+    }
+
+    pub(crate) fn try_from_bytes(b: &[u8]) -> std::result::Result<Self, VlqError> {
+        let temp = from_bytes(b)?;
+        if temp.len() != 1 {
+            return Err(VlqError::UnexpectedMultipleVlqs);
+        }
+        Ok(Self { bytes: temp[0] })
+    }
+}
+
+impl TryFrom<u64> for Vlq {
+    type Error = VlqError;
+
+    fn try_from(value: u64) -> std::result::Result<Self, Self::Error> {
+        Ok(u32::try_from(value).map_err(|_| VlqError::Overflow)?.into())
+    }
+}
+
+impl From<u32> for Vlq {
+    fn from(value: u32) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<u16> for Vlq {
+    fn from(value: u16) -> Self {
+        Self::new(value.into())
+    }
+}
+
+impl From<u8> for Vlq {
+    fn from(value: u8) -> Self {
+        Self::new(value.into())
+    }
+}
+
+impl Into<u64> for Vlq {
+    fn into(self) -> u64 {
+        self.bytes.into()
+    }
+}
+
+impl Into<u32> for Vlq {
+    fn into(self) -> u32 {
+        self.bytes
+    }
+}
+
+impl TryInto<u16> for Vlq {
+    type Error = VlqError;
+
+    fn try_into(self) -> Result<u16, Self::Error> {
+        u16::try_from(self.bytes).map_err(|_| VlqError::Overflow)
+    }
+}
+
+impl TryInto<u8> for Vlq {
+    type Error = VlqError;
+
+    fn try_into(self) -> Result<u8, Self::Error> {
+        u8::try_from(self.bytes).map_err(|_| VlqError::Overflow)
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum VlqError {
     IncompleteNumber,
     Overflow,
+    UnexpectedMultipleVlqs,
 }
 
 impl Display for VlqError {
@@ -84,32 +163,6 @@ pub(crate) fn decode_slice(bytes: &[u8]) -> std::result::Result<u32, VlqError> {
 
     Ok(result)
 }
-
-// pub(crate) fn parse_u32<R: Read>(r: &mut R) -> LibResult<Option<u32>> {
-//     let mut bytes = Vec::new();
-//     let mut buf = [0u8];
-//     // initialize with the continue bit set
-//     let mut current_byte = CONTINUE;
-//     let mut bytes_read = 0u8;
-//     while current_byte & CONTINUE == CONTINUE {
-//         if bytes_read >= 4 {
-//             return error::Other { site: site!() }.fail();
-//             //Err(crate::LibError::Badness);
-//         }
-//         current_byte = match r.read_exact(&mut buf) {
-//             Err(e) => match e.kind() {
-//                 ErrorKind::UnexpectedEof if bytes_read == 0 => return Ok(None),
-//                 _ => return Err(e).context(error::Io { site: site!() }),
-//             },
-//             Ok(_) => buf[0],
-//         };
-//         bytes.push(current_byte);
-//         bytes_read = bytes_read + 1;
-//     }
-//     Ok(Some(
-//         decode_slice(&bytes).map_err(|_| LibError::Other { site: site!() })?,
-//     ))
-// }
 
 #[test]
 fn to_single_byte() {
@@ -229,7 +282,6 @@ fn im_stupid_right_7() {
     let somebits: u32 = 0b1111_0000_1111_0000_1111_0000_1111_0000;
     let expected: u32 = 0b0000_0001_1110_0001_1110_0001_1110_0001;
     let actual = somebits >> 7;
-    println!("actual: {:#018b}", actual);
     assert_eq!(expected, actual);
 }
 
@@ -238,8 +290,5 @@ fn im_stupid_left_7() {
     let somebits: u32 = 0b1111_0000_1111_0000_1111_0000_1111_0000;
     let expected: u32 = 0b0111_1000_0111_1000_0111_1000_0000_0000;
     let actual = somebits << 7;
-    println!("somebits: {:#b}", somebits);
-    println!("expected: {:#b}", expected);
-    println!("  actual: {:#b}", actual);
     assert_eq!(expected, actual);
 }

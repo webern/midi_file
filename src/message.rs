@@ -4,36 +4,11 @@ use crate::constants::StatusType;
 use crate::error::{self, LibResult};
 use snafu::ResultExt;
 use std::convert::TryFrom;
-use std::io::Read;
+use std::io::{Read, Write};
 
-// #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub enum ChannelMessageType {
-//     Voice(VoiceMessage),
-//     Mode(ModeMessage),
-// }
-//
-// impl Default for ChannelMessageType {
-//     fn default() -> Self {
-//         ChannelMessageType::Voice(VoiceMessage::default())
-//     }
-// }
-
-// #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub enum VoiceMessage {
-//     NoteOff(NoteMessage),
-//     NoteOn(NoteMessage),
-//     PolyPressure(NoteMessage),
-//     Control(ControlChangeMessage),
-//     Program(ProgramMessage),
-//     ChannelPressure(ChannelPressureMessage),
-//     PitchBend(PitchBendMessage),
-// }
-
-// impl Default for VoiceMessage {
-//     fn default() -> Self {
-//         VoiceMessage::NoteOff(NoteMessage::default())
-//     }
-// }
+pub(crate) trait WriteBytes {
+    fn write<W: Write>(&self, w: &mut W) -> LibResult<()>;
+}
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NoteMessage {
@@ -50,41 +25,43 @@ impl NoteMessage {
             velocity: iter.read_or_die().context(io!())?.into(),
         })
     }
+
+    fn write<W: Write>(&self, w: &mut W, st: StatusType) -> LibResult<()> {
+        write_status_byte(w, st, self.channel)?;
+        w.write_all(&self.note_number.get().to_be_bytes())
+            .context(wr!())?;
+        w.write_all(&self.velocity.get().to_be_bytes())
+            .context(wr!())?;
+        Ok(())
+    }
 }
 
-// #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub struct ControlChangeMessage {
-//     channel: Channel,
-//     control_type: ControlType,
-//     control_value: ControlValue,
-// }
-
-// #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub enum ControlType {
-//     Todo,
-// }
-
-// impl Default for ControlType {
-//     fn default() -> Self {
-//         ControlType::Todo
-//     }
-// }
-
 clamp!(NoteNumber, u8, 0, 127, 60, pub);
-
 clamp!(Velocity, u8, 0, 127, 72, pub);
-
-// #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub struct ControlValue {}
-
-// #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-// pub struct ProgramMessage {}
 clamp!(Program, u8, 0, 127, 0, pub);
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ProgramChangeValue {
     channel: Channel,
     program: Program,
+}
+
+impl ProgramChangeValue {
+    pub fn channel(&self) -> &Channel {
+        &self.channel
+    }
+
+    pub fn program(&self) -> &Program {
+        &self.program
+    }
+}
+
+impl WriteBytes for ProgramChangeValue {
+    fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+        write_status_byte(w, StatusType::Program, self.channel)?;
+        write_u8!(w, self.program.get())?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -208,7 +185,7 @@ impl Default for Message {
 
 impl Message {
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        let byte = iter.read_or_die().context(error::Io { site: site!() })?;
+        let byte = iter.read_or_die().context(io!())?;
         // first check if the message is a sysex or realtime message (using the whole byte).
         match byte {
             x if SystemRealtimeMessage::TimingClock as u8 == x => return Ok(Message::TimingClock),
@@ -246,6 +223,40 @@ impl Message {
         }
         // panic!("{:?}", status_type);
     }
+
+    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+        match self {
+            Message::NoteOff(value) => value.write(w, StatusType::NoteOff),
+            Message::NoteOn(value) => value.write(w, StatusType::NoteOn),
+            Message::PolyPressure(value) => value.write(w, StatusType::PolyPressure),
+            Message::Control(value) => value.write(w),
+            Message::ProgramChange(value) => value.write(w),
+            Message::ChannelPressure(_) => unimplemented!(),
+            Message::PitchBend(_) => unimplemented!(),
+            Message::AllSoundsOff(_) => unimplemented!(),
+            Message::ResetAllControllers(_) => unimplemented!(),
+            Message::LocalControlOff(_) => unimplemented!(),
+            Message::LocalControlOn(_) => unimplemented!(),
+            Message::AllNotesOff(_) => unimplemented!(),
+            Message::OmniModeOff(_) => unimplemented!(),
+            Message::OmniModeOn(_) => unimplemented!(),
+            Message::MonoModeOn(_) => unimplemented!(),
+            Message::PolyModeOn(_) => unimplemented!(),
+            Message::MidiTimeCodeQuarterFrame(_) => unimplemented!(),
+            Message::SongPositionPointer(_) => unimplemented!(),
+            Message::SongSelect(_) => unimplemented!(),
+            Message::TuneRequest => unimplemented!(),
+            Message::EndOfSysexFlag => unimplemented!(),
+            Message::TimingClock => unimplemented!(),
+            Message::Undefined1 => unimplemented!(),
+            Message::Start => unimplemented!(),
+            Message::Continue => unimplemented!(),
+            Message::Stop => unimplemented!(),
+            Message::Undefined2 => unimplemented!(),
+            Message::ActiveSensing => unimplemented!(),
+            Message::SystemReset => unimplemented!(),
+        }
+    }
 }
 
 /// Returns (4-bit status part, 4-bit channel).
@@ -255,6 +266,20 @@ fn split_byte(status_byte: u8) -> LibResult<(StatusType, Channel)> {
     let channel_value = status_byte & 0b0000_1111;
     let channel: Channel = channel_value.into();
     Ok((status_type, channel))
+}
+
+/// Combines the status part and channel part of a channel voice message.
+fn merge_byte(status: StatusType, channel: Channel) -> u8 {
+    let status_number = status as u8;
+    let status_bits = status_number << 4;
+    let channel_bits = channel.get();
+    status_bits | channel_bits
+}
+
+/// Combines then writes the status part and channel part of a channel voice message.
+fn write_status_byte<W: Write>(w: &mut W, status: StatusType, channel: Channel) -> LibResult<()> {
+    let data = merge_byte(status, channel);
+    write_u8!(w, data)
 }
 
 fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Message> {
@@ -578,4 +603,25 @@ pub struct ControlChangeValue {
     channel: Channel,
     control: Control,
     value: ControlValue,
+}
+
+impl ControlChangeValue {
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+    pub fn control(&self) -> Control {
+        self.control
+    }
+    pub fn value(&self) -> ControlValue {
+        self.value
+    }
+}
+
+impl WriteBytes for ControlChangeValue {
+    fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+        write_status_byte(w, StatusType::ControlOrSelectChannelMode, self.channel)?;
+        write_u8!(w, self.control as u8)?;
+        write_u8!(w, self.value.get())?;
+        Ok(())
+    }
 }
