@@ -6,6 +6,10 @@ use std::io::{BufReader, Bytes, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::str::{from_utf8, Utf8Error};
 
+/// The internals are weird, it's basically a debugging thing to be able to see the next few falues
+/// at a breakpoint. Practically speaking, there is somewhere where I want to 're-read' the
+/// 'current' value, so at least the 'current' cached value is useful, but the various 'peeks'
+/// turned out to be unused.
 pub(crate) struct ByteIter<R: Read> {
     iter: Bytes<R>,
     position: Option<u64>,
@@ -255,39 +259,6 @@ impl<R: Read> ByteIter<R> {
         })
     }
 
-    /// Get the next value without advancing the iterator:
-    /// ```text
-    ///       peek
-    ///       v   
-    /// 0x00, 0x01, 0x02, 0x03
-    /// ^ current
-    /// ```
-    pub(crate) fn peek(&self) -> Option<u8> {
-        self.peek1
-    }
-
-    /// Get the value after the next value without advancing the iterator:
-    /// ```text
-    ///             peek2
-    ///             v   
-    /// 0x00, 0x01, 0x02, 0x03
-    /// ^ current
-    /// ```
-    pub(crate) fn peek2(&self) -> Option<u8> {
-        self.peek2
-    }
-
-    /// Get the value after the value after the next value without advancing the iterator:
-    /// ```text
-    ///                   peek3
-    ///                   v   
-    /// 0x00, 0x01, 0x02, 0x03
-    /// ^ current
-    /// ```
-    pub(crate) fn peek3(&self) -> Option<u8> {
-        self.peek3
-    }
-
     pub(crate) fn is_end(&self) -> bool {
         if let Some(limit) = self.position_limit {
             debug_assert!(self.position.is_some());
@@ -314,41 +285,6 @@ impl<R: Read> ByteIter<R> {
         );
         Ok(())
     }
-
-    /// Returns true if `current()` is the start of `expected_tag`.
-    pub(crate) fn is_tag(&self, expected_tag: &str) -> bool {
-        let mut tag_bytes = [0u8; 4];
-        tag_bytes[0] = match self.current {
-            None => return false,
-            Some(val) => val,
-        };
-        tag_bytes[1] = match self.peek1 {
-            None => return false,
-            Some(val) => val,
-        };
-        tag_bytes[2] = match self.peek2 {
-            None => return false,
-            Some(val) => val,
-        };
-        tag_bytes[3] = match self.peek3 {
-            None => return false,
-            Some(val) => val,
-        };
-        let found = match from_utf8(&tag_bytes) {
-            Ok(val) => val,
-            Err(_) => return false,
-        };
-        expected_tag == found
-    }
-
-    // pub(crate) fn read_tag(&mut self) -> ByteResult<String> {
-    //     let tag_bytes = self.read4()?;
-    //     Ok(from_utf8(&tag_bytes)
-    //         .context(Str {
-    //             position: self.position,
-    //         })?
-    //         .to_owned())
-    // }
 
     /// When this is set, the ByteIter will report that it is at the end when `size` bytes have been
     /// read.

@@ -12,9 +12,9 @@ pub(crate) trait WriteBytes {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NoteMessage {
-    channel: Channel,
-    note_number: NoteNumber,
-    velocity: Velocity,
+    pub(crate) channel: Channel,
+    pub(crate) note_number: NoteNumber,
+    pub(crate) velocity: Velocity,
 }
 
 impl NoteMessage {
@@ -42,8 +42,8 @@ clamp!(Program, u8, 0, 127, 0, pub);
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ProgramChangeValue {
-    channel: Channel,
-    program: Program,
+    pub(crate) channel: Channel,
+    pub(crate) program: Program,
 }
 
 impl ProgramChangeValue {
@@ -583,10 +583,6 @@ impl Control {
             x if x == Control::Undefined119 as u8 => Ok(Control::Undefined119),
             _ => error::Other { site: site!() }.fail(),
         }
-    }
-
-    pub(crate) fn to_u8(&self) -> u8 {
-        *self as u8
     }
 }
 

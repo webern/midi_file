@@ -18,4 +18,12 @@ test:
 	cargo test
 
 .PHONY: ci
-ci: lint build test
+ci: lint build test lint_example run_example
+
+.PHONY: run_example
+run_example:
+	cargo run --example main
+
+.PHONY: run_example
+lint_example:
+	cargo clippy --example main -- -D warnings

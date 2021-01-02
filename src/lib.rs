@@ -1,4 +1,10 @@
-#![allow(dead_code)]
+#![deny(clippy::complexity)]
+#![deny(clippy::perf)]
+#![deny(clippy::style)]
+#![deny(dead_code)]
+#![deny(nonstandard_style)]
+#![deny(rust_2018_idioms)]
+#![deny(unreachable_patterns)]
 
 #[macro_use]
 mod error;
@@ -19,13 +25,14 @@ pub mod constants;
 pub mod message;
 pub mod vlq;
 
+use crate::channel::Channel;
 use crate::constants::{FILE_META_EVENT, FILE_SYSEX_F0, FILE_SYSEX_F7};
 use crate::error::LibResult;
-use crate::message::Message;
+use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
 use crate::vlq::Vlq;
 pub use error::{Error, Result};
 use log::{debug, trace};
-use snafu::{OptionExt, ResultExt};
+use snafu::{ensure, OptionExt, ResultExt};
 use std::fs::File;
 
 // https://www.music.mcgill.ca/~gary/306/week9/smf.html
@@ -38,28 +45,14 @@ pub struct MidiFile {
 }
 
 impl MidiFile {
-    fn read_inner<R: Read>(mut iter: ByteIter<R>) -> LibResult<Self> {
-        trace!("parsing header chunk");
-        iter.expect_tag("MThd").context(io!())?;
-        let chunk_length = iter.read_u32().context(io!())?;
-        // header chunk length is always 6
-        if chunk_length != 6 {
-            return error::Other { site: site!() }.fail();
+    pub fn new(format: Format) -> Self {
+        Self {
+            header: Header {
+                format,
+                division: Default::default(),
+            },
+            tracks: Vec::new(),
         }
-        let format_word = iter.read_u16().context(io!())?;
-        let num_tracks = iter.read_u16().context(io!())?;
-        let division_data = iter.read_u16().context(io!())?;
-        let format = Format::from_u16(format_word)?;
-        let header = Header {
-            format,
-            division: Division::from_u16(division_data)?,
-        };
-        let mut tracks = Vec::new();
-        for i in 0..num_tracks {
-            trace!("parsing track chunk {} (zero-based) of {}", i, num_tracks);
-            tracks.push(Track::parse(&mut iter)?)
-        }
-        Ok(Self { header, tracks })
     }
 
     pub fn read<R: Read>(r: R) -> Result<Self> {
@@ -96,17 +89,85 @@ impl MidiFile {
         &self.header
     }
 
-    pub fn tracks_len(&self) -> usize {
-        self.tracks.len()
+    pub fn tracks_len(&self) -> u32 {
+        u32::try_from(self.tracks.len()).unwrap_or(u32::MAX)
     }
 
     pub fn tracks(&self) -> impl Iterator<Item = &Track> {
         self.tracks.iter()
     }
 
-    pub fn track(&self, index: usize) -> Option<&Track> {
-        self.tracks.get(index)
+    pub fn track(&self, index: u32) -> Option<&Track> {
+        let i = match usize::try_from(index) {
+            Ok(ok) => ok,
+            Err(_) => return None,
+        };
+        self.tracks.get(i)
     }
+
+    pub fn push_track(&mut self, track: Track) -> Result<()> {
+        ensure!(self.tracks_len() < u32::MAX, error::Other { site: site!() });
+        if *self.header().format() == Format::Single {
+            ensure!(self.tracks_len() <= 1, error::Other { site: site!() });
+        }
+        self.tracks.push(ensure_end_of_track(track)?);
+        Ok(())
+    }
+
+    pub fn insert_track(&mut self, index: u32, track: Track) -> Result<()> {
+        ensure!(self.tracks_len() < u32::MAX, error::Other { site: site!() });
+        if *self.header().format() == Format::Single {
+            ensure!(self.tracks_len() <= 1, error::Other { site: site!() });
+        }
+        ensure!(index < self.tracks_len(), error::Other { site: site!() });
+        self.tracks.insert(
+            usize::try_from(index).context(error::TooManyTracks { site: site!() })?,
+            ensure_end_of_track(track)?,
+        );
+        Ok(())
+    }
+
+    pub fn remove_track(&mut self, index: u32) -> Result<Track> {
+        ensure!(index < self.tracks_len(), error::Other { site: site!() });
+        let i = usize::try_from(index).context(error::TooManyTracks { site: site!() })?;
+        Ok(self.tracks.remove(i))
+    }
+
+    fn read_inner<R: Read>(mut iter: ByteIter<R>) -> LibResult<Self> {
+        trace!("parsing header chunk");
+        iter.expect_tag("MThd").context(io!())?;
+        let chunk_length = iter.read_u32().context(io!())?;
+        // header chunk length is always 6
+        if chunk_length != 6 {
+            return error::Other { site: site!() }.fail();
+        }
+        let format_word = iter.read_u16().context(io!())?;
+        let num_tracks = iter.read_u16().context(io!())?;
+        let division_data = iter.read_u16().context(io!())?;
+        let format = Format::from_u16(format_word)?;
+        let header = Header {
+            format,
+            division: Division::from_u16(division_data)?,
+        };
+        let mut tracks = Vec::new();
+        for i in 0..num_tracks {
+            trace!("parsing track chunk {} (zero-based) of {}", i, num_tracks);
+            tracks.push(Track::parse(&mut iter)?)
+        }
+        Ok(Self { header, tracks })
+    }
+}
+
+/// When a track is pushed or inserted, we check to make sure the the last item is EndOfTrack.
+fn ensure_end_of_track(mut track: Track) -> LibResult<Track> {
+    if let Some(last_event) = track.events.last() {
+        if !matches!(last_event.event, Event::Meta(MetaEvent::EndOfTrack)) {
+            track.push_event(0, Event::Meta(MetaEvent::EndOfTrack))?;
+        }
+    } else {
+        track.push_event(0, Event::Meta(MetaEvent::EndOfTrack))?;
+    }
+    Ok(track)
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
@@ -277,12 +338,184 @@ pub struct Track {
 }
 
 impl Track {
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
     pub fn events_len(&self) -> usize {
         self.events.len()
     }
 
     pub fn events(&self) -> impl Iterator<Item = &TrackEvent> {
         self.events.iter()
+    }
+
+    pub fn push_event(&mut self, delta_time: u32, event: Event) -> Result<()> {
+        // TODO check length is not bigger than u32
+        self.events.push(TrackEvent { delta_time, event });
+        Ok(())
+    }
+
+    pub fn insert_event(&mut self, index: u32, delta_time: u32, event: Event) -> Result<()> {
+        // TODO check length is not bigger than u32, index is in range, etc
+        self.events
+            .insert(index as usize, TrackEvent { delta_time, event });
+        Ok(())
+    }
+
+    pub fn replace_event(&mut self, index: u32, delta_time: u32, event: Event) -> Result<()> {
+        // TODO check length is not bigger than u32, index is in range, etc
+        // std::mem::replace(&mut , TrackEvent{delta_time, event})
+        self.events[index as usize] = TrackEvent { delta_time, event };
+        Ok(())
+    }
+
+    pub fn set_name<S: Into<String>>(&mut self, name: S) -> Result<()> {
+        let name = name.into();
+        let meta = Event::Meta(MetaEvent::TrackName(name.clone()));
+        if self.is_empty() {
+            self.push_event(0, meta)?;
+            return Ok(());
+        }
+        for (ix, event) in self.events.iter_mut().enumerate() {
+            if event.delta_time != 0 {
+                break;
+            }
+            if let Event::Meta(meta_event) = &event.event {
+                if let MetaEvent::TrackName(s) = meta_event {
+                    debug!("changing track name from '{}' to '{}'", s, name);
+                    self.replace_event(ix as u32, 0, meta)?;
+                    return Ok(());
+                }
+            }
+
+            if let Event::Meta(MetaEvent::TrackName(s)) = &event.event {
+                debug!("changing track name from '{}' to '{}'", s, name);
+                self.replace_event(ix as u32, 0, meta)?;
+                return Ok(());
+            }
+        }
+        self.insert_event(0, 0, meta)?;
+        Ok(())
+    }
+
+    pub fn set_instrument_name<S: Into<String>>(&mut self, name: S) -> Result<()> {
+        let name = name.into();
+        let meta = Event::Meta(MetaEvent::InstrumentName(name.clone()));
+        if self.is_empty() {
+            self.push_event(0, meta)?;
+            return Ok(());
+        }
+        for (ix, event) in self.events.iter_mut().enumerate() {
+            if event.delta_time != 0 {
+                break;
+            }
+            if let Event::Meta(meta_event) = &event.event {
+                if let MetaEvent::InstrumentName(s) = meta_event {
+                    debug!("changing instrument name from '{}' to '{}'", s, name);
+                    self.replace_event(ix as u32, 0, meta)?;
+                    return Ok(());
+                }
+            }
+        }
+        self.insert_event(0, 0, meta)?;
+        Ok(())
+    }
+
+    pub fn set_general_midi(&mut self, channel: Channel, value: GeneralMidi) -> Result<()> {
+        let program_change = Event::Midi(Message::ProgramChange(ProgramChangeValue {
+            channel,
+            program: Program::new(value.into()),
+        }));
+        if self.is_empty() {
+            self.push_event(0, program_change)?;
+            return Ok(());
+        }
+        for (ix, event) in self.events.iter_mut().enumerate() {
+            if event.delta_time != 0 {
+                break;
+            }
+            if let Event::Midi(midi_event) = &event.event {
+                if let Message::ProgramChange(prog) = midi_event {
+                    debug!(
+                        "changing program from '{}' to '{:?}'",
+                        prog.program.get(),
+                        value
+                    );
+                    self.replace_event(ix as u32, 0, program_change)?;
+                    return Ok(());
+                }
+            }
+        }
+        self.insert_event(0, 0, program_change)?;
+        Ok(())
+    }
+
+    pub fn push_time_signature(
+        &mut self,
+        delta_time: u32,
+        numerator: u8,
+        denominator: DurationName,
+        click: Clocks,
+    ) -> Result<()> {
+        let time_sig = TimeSignatureValue {
+            numerator,
+            denominator,
+            click,
+            ..TimeSignatureValue::default()
+        };
+        let event = Event::Meta(MetaEvent::TimeSignature(time_sig));
+        self.push_event(delta_time, event)
+    }
+
+    pub fn push_tempo(
+        &mut self,
+        delta_time: u32,
+        quarters_per_minute: QuartersPerMinute,
+    ) -> Result<()> {
+        // convert to microseconds per quarter note
+        let minutes_per_quarter = 1f64 / f64::from(quarters_per_minute.get());
+        let seconds_per_quarter = minutes_per_quarter * 60f64;
+        let microseconds_per_quarter = seconds_per_quarter * 1000000f64;
+        let value = microseconds_per_quarter as u32;
+        let event = Event::Meta(MetaEvent::SetTempo(MicrosecondsPerQuarter::new(value)));
+        self.push_event(delta_time, event)
+    }
+
+    pub fn push_note_on(
+        &mut self,
+        delta_time: u32,
+        channel: Channel,
+        note_number: NoteNumber,
+        velocity: Velocity,
+    ) -> Result<()> {
+        let note_on = Event::Midi(Message::NoteOn(NoteMessage {
+            channel,
+            note_number,
+            velocity,
+        }));
+        self.push_event(delta_time, note_on)?;
+        Ok(())
+    }
+
+    pub fn push_note_off(
+        &mut self,
+        delta_time: u32,
+        channel: Channel,
+        note_number: NoteNumber,
+        velocity: Velocity,
+    ) -> Result<()> {
+        let note_off = Event::Midi(Message::NoteOff(NoteMessage {
+            channel,
+            note_number,
+            velocity,
+        }));
+        self.push_event(delta_time, note_off)
+    }
+
+    pub fn push_lyric<S: Into<String>>(&mut self, delta_time: u32, lyric: S) -> Result<()> {
+        let lyric = Event::Meta(MetaEvent::Lyric(lyric.into()));
+        self.push_event(delta_time, lyric)
     }
 
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
@@ -394,9 +627,10 @@ impl Default for Event {
 impl Event {
     fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
         let status_byte = iter.peek_or_die().context(io!())?;
-        // let status_val = status_byte >> 4;
         match status_byte {
-            FILE_SYSEX_F7 | FILE_SYSEX_F0 => unimplemented!(),
+            FILE_SYSEX_F7 | FILE_SYSEX_F0 => {
+                Ok(Event::Sysex(SysexEvent::parse(status_byte, iter)?))
+            }
             FILE_META_EVENT => {
                 trace!("I peeked at {:#x}, a MetaEvent!", status_byte);
                 Ok(Event::Meta(MetaEvent::parse(iter)?))
@@ -427,7 +661,7 @@ pub struct SysexEvent {
 }
 
 impl SysexEvent {
-    fn parse<R: Read>(_first_byte: u8, _r: &mut R) -> LibResult<Self> {
+    fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> LibResult<Self> {
         unimplemented!()
     }
 
@@ -597,15 +831,16 @@ impl MetaEvent {
         iter.read_expect(0xff).context(io!())?;
         let meta_type_byte = iter.read_or_die().context(io!())?;
         match meta_type_byte {
-            0x01..=0x09 => MetaEvent::parse_text(iter),
-            0x20 => panic!("{:?}", MetaEvent::MidiChannelPrefix),
-            0x2f => Ok(MetaEvent::parse_end_of_track(iter)?),
-            0x51 => Ok(MetaEvent::SetTempo(MicrosecondsPerQuarter::parse(iter)?)),
-            0x54 => Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?)),
-            0x58 => Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?)),
-            0x59 => Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?)),
-            0x7f => panic!("{:?}", MetaEvent::Sequencer),
-            _ => error::Other { site: site!() }.fail(),
+            META_SEQUENCE_NUM => unimplemented!(),
+            META_TEXT..=META_DEVICE_NAME => MetaEvent::parse_text(iter),
+            META_CHAN_PREFIX => panic!("{:?}", MetaEvent::MidiChannelPrefix),
+            META_END_OF_TRACK => Ok(MetaEvent::parse_end_of_track(iter)?),
+            META_SET_TEMPO => Ok(MetaEvent::SetTempo(MicrosecondsPerQuarter::parse(iter)?)),
+            META_SMTPE_OFFSET => Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?)),
+            META_TIME_SIG => Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?)),
+            META_KEY_SIG => Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?)),
+            META_SEQ_SPECIFIC => panic!("{:?}", MetaEvent::Sequencer),
+            _ => invalid_file!("unrecognized byte {:#04X}", meta_type_byte),
         }
     }
 
@@ -630,9 +865,9 @@ impl MetaEvent {
             }
             MetaEvent::SetTempo(value) => {
                 // meta event type
-                w.write_all(&[0x51]).context(wr!())?;
+                write_u8!(w, META_SET_TEMPO)?;
                 // data length
-                w.write_all(&[0x03]).context(wr!())?;
+                write_u8!(w, LEN_META_SET_TEMPO)?;
                 // we are encoding a 24-bit be number, so first get it as be bytes
                 let bytes = u32::to_be_bytes(value.get());
                 // my ide doesn't seem to know if this is guaranteed to be len 4
@@ -661,16 +896,16 @@ impl MetaEvent {
         // the spec does not strictly specify what encoding should be used for strings
         let s = String::from_utf8_lossy(&bytes).to_string();
         match text_type {
-            0x01 => Ok(MetaEvent::Text(s)),
-            0x02 => Ok(MetaEvent::Copyright(s)),
-            0x03 => Ok(MetaEvent::TrackName(s)),
-            0x04 => Ok(MetaEvent::InstrumentName(s)),
-            0x05 => Ok(MetaEvent::Lyric(s)),
-            0x06 => Ok(MetaEvent::Marker(s)),
-            0x07 => Ok(MetaEvent::CuePoint(s)),
-            0x08 => Ok(MetaEvent::ProgramName(s)),
-            0x09 => Ok(MetaEvent::DeviceName(s)),
-            _ => error::Other { site: site!() }.fail(),
+            META_TEXT => Ok(MetaEvent::Text(s)),
+            META_COPYRIGHT => Ok(MetaEvent::Copyright(s)),
+            META_TRACK_NAME => Ok(MetaEvent::TrackName(s)),
+            META_INSTR_NAME => Ok(MetaEvent::InstrumentName(s)),
+            META_LYRIC => Ok(MetaEvent::Lyric(s)),
+            META_MARKER => Ok(MetaEvent::Marker(s)),
+            META_CUE_POINT => Ok(MetaEvent::CuePoint(s)),
+            META_PROG_NAME => Ok(MetaEvent::ProgramName(s)),
+            META_DEVICE_NAME => Ok(MetaEvent::DeviceName(s)),
+            _ => invalid_file!("unrecognized byte {:#04X}", text_type),
         }
     }
 }
@@ -738,6 +973,7 @@ pub(crate) const META_TIME_SIG: u8 = 0x58;
 pub(crate) const META_KEY_SIG: u8 = 0x59;
 pub(crate) const META_SEQ_SPECIFIC: u8 = 0x7f;
 
+#[allow(dead_code)] // TODO - implement
 pub(crate) const LEN_META_CHAN_PREFIX: u8 = 1;
 pub(crate) const LEN_META_END_OF_TRACK: u8 = 0;
 pub(crate) const LEN_META_SET_TEMPO: u8 = 3;
@@ -784,8 +1020,7 @@ impl TimeSignatureValue {
     }
 
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        // after 0x58 we should see 0x04
-        iter.read_expect(0x04).context(io!())?;
+        iter.read_expect(LEN_META_TIME_SIG).context(io!())?;
         Ok(Self {
             numerator: iter.read_or_die().context(io!())?,
             denominator: DurationName::from_u8(iter.read_or_die().context(io!())?)?,
@@ -864,15 +1099,6 @@ impl DurationName {
             v if DurationName::D1024 as u8 == v => Ok(DurationName::D1024),
             _ => error::Other { site: site!() }.fail(),
         }
-    }
-
-    pub(crate) fn to_u8(&self) -> u8 {
-        *self as u8
-    }
-
-    /// i.e. in 4/4, the denominator is [`DurationName::Quarter`].
-    pub(crate) fn to_notated_number(&self) -> u8 {
-        self.to_u8() + 2
     }
 }
 
@@ -971,8 +1197,7 @@ pub struct KeySignatureValue {
 
 impl KeySignatureValue {
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        // after 0x59 we should see 0x02
-        iter.read_expect(0x02).context(io!())?;
+        iter.read_expect(LEN_META_KEY_SIG).context(io!())?;
         let raw_accidentals_byte = iter.read_or_die().context(io!())?;
         let casted_accidentals = raw_accidentals_byte as i8;
         Ok(Self {
@@ -1021,12 +1246,152 @@ clamp!(
 
 impl MicrosecondsPerQuarter {
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        // after 0x51 we should see 0x03
-        iter.read_expect(0x03).context(io!())?;
-        let bytes = iter.read_n(3).context(io!())?;
+        iter.read_expect(LEN_META_SET_TEMPO).context(io!())?;
+        let bytes = iter.read_n(LEN_META_SET_TEMPO as usize).context(io!())?;
         // bytes is a big-endian u24. fit it into a big-endian u32 then parse it
         let beu32 = [0u8, bytes[0], bytes[1], bytes[2]];
         let parsed_number = u32::from_be_bytes(beu32);
         Ok(MicrosecondsPerQuarter::new(parsed_number))
     }
 }
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum GeneralMidi {
+    AcousticGrandPiano = 1,
+    BrightAcousticPiano = 2,
+    ElectricGrandPiano = 3,
+    HonkyTonkPiano = 4,
+    ElectricPiano1 = 5,
+    ElectricPiano2 = 6,
+    Harpsichord = 7,
+    Clavi = 8,
+    Celesta = 9,
+    Glockenspiel = 10,
+    MusicBox = 11,
+    Vibraphone = 12,
+    Marimba = 13,
+    Xylophone = 14,
+    TubularBells = 15,
+    Dulcimer = 16,
+    DrawbarOrgan = 17,
+    PercussiveOrgan = 18,
+    RockOrgan = 19,
+    ChurchOrgan = 20,
+    ReedOrgan = 21,
+    Accordion = 22,
+    Harmonica = 23,
+    TangoAccordion = 24,
+    AcousticGuitarNylon = 25,
+    AcousticGuitarSteel = 26,
+    ElectricGuitarJazz = 27,
+    ElectricGuitarClean = 28,
+    ElectricGuitarMuted = 29,
+    OverdrivenGuitar = 30,
+    DistortionGuitar = 31,
+    GuitarHarmonics = 32,
+    AcousticBass = 33,
+    ElectricBassFinger = 34,
+    ElectricBassPick = 35,
+    FretlessBass = 36,
+    SlapBass1 = 37,
+    SlapBass2 = 38,
+    SynthBass1 = 39,
+    SynthBass2 = 40,
+    Violin = 41,
+    Viola = 42,
+    Cello = 43,
+    Contrabass = 44,
+    TremoloStrings = 45,
+    PizzicatoStrings = 46,
+    OrchestralHarp = 47,
+    Timpani = 48,
+    StringEnsemble1 = 49,
+    StringEnsemble2 = 50,
+    SynthStrings1 = 51,
+    SynthStrings2 = 52,
+    ChoirAahs = 53,
+    VoiceOohs = 54,
+    SynthVoice = 55,
+    OrchestraHit = 56,
+    Trumpet = 57,
+    Trombone = 58,
+    Tuba = 59,
+    MutedTrumpet = 60,
+    FrenchHorn = 61,
+    BrassSection = 62,
+    SynthBrass1 = 63,
+    SynthBrass2 = 64,
+    SopranoSax = 65,
+    AltoSax = 66,
+    TenorSax = 67,
+    BaritoneSax = 68,
+    Oboe = 69,
+    EnglishHorn = 70,
+    Bassoon = 71,
+    Clarinet = 72,
+    Piccolo = 73,
+    Flute = 74,
+    Recorder = 75,
+    PanFlute = 76,
+    BlownBottle = 77,
+    Shakuhachi = 78,
+    Whistle = 79,
+    Ocarina = 80,
+    Lead1Square = 81,
+    Lead2Sawtooth = 82,
+    Lead3Calliope = 83,
+    Lead4Chiff = 84,
+    Lead5Charang = 85,
+    Lead6Voice = 86,
+    Lead7Fifths = 87,
+    Lead8BassPlusLead = 88,
+    Pad1Newage = 89,
+    Pad2Warm = 90,
+    Pad3Polysynth = 91,
+    Pad4Choir = 92,
+    Pad5Bowed = 93,
+    Pad6Metallic = 94,
+    Pad7Halo = 95,
+    Pad8Sweep = 96,
+    Fx1Rain = 97,
+    Fx2Soundtrack = 98,
+    Fx3Crystal = 99,
+    Fx4Atmosphere = 100,
+    Fx5Brightness = 101,
+    Fx6Goblins = 102,
+    Fx7Echoes = 103,
+    Fx8SciFi = 104,
+    Sitar = 105,
+    Banjo = 106,
+    Shamisen = 107,
+    Koto = 108,
+    Kalimba = 109,
+    Bagpipe = 110,
+    Fiddle = 111,
+    Shanai = 112,
+    TinkleBell = 113,
+    Agogo = 114,
+    SteelDrums = 115,
+    Woodblock = 116,
+    TaikoDrum = 117,
+    MelodicTom = 118,
+    SynthDrum = 119,
+    ReverseCymbal = 120,
+    GuitarFretNoise = 121,
+    BreathNoise = 122,
+    Seashore = 123,
+    BirdTweet = 124,
+    TelephoneRing = 125,
+    Helicopter = 126,
+    Applause = 127,
+    Gunshot = 128,
+}
+
+impl Into<u8> for GeneralMidi {
+    fn into(self) -> u8 {
+        self as u8
+    }
+}
+
+clamp!(QuartersPerMinute, u8, 1, u8::MAX, 120, pub);

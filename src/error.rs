@@ -60,6 +60,12 @@ pub(crate) enum LibError {
     },
 }
 
+impl From<Error> for LibError {
+    fn from(e: Error) -> Self {
+        e.0
+    }
+}
+
 macro_rules! site {
     () => {
         format!("{}:{}", file!(), line!())

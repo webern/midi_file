@@ -13,18 +13,21 @@ macro_rules! clamp {
 
         impl $symbol {
             /// Silently clamps the value if it is out of range.
-            $visibility fn new(value: $inner_type) -> Self {
+            #[allow(dead_code)]
+            $visibility const fn new(value: $inner_type) -> Self {
                 let (clamped, _) = Self::clamp(value);
                 Self(clamped)
             }
 
             /// Returns the inner value.
+            #[allow(dead_code)]
             $visibility fn get(&self) -> $inner_type {
                 self.0
             }
 
             /// Clamps and sets. Returns `true` if `value` was in range. Returns `false` if `value`
             /// was out-of-range.
+            #[allow(dead_code)]
             $visibility fn set(&mut self, value: $inner_type) -> bool {
                 let (clamped, result) = Self::clamp(value);
                 self.0 = clamped;
@@ -32,7 +35,7 @@ macro_rules! clamp {
             }
 
             #[allow(unused_comparisons)]
-            fn clamp(value: $inner_type) -> ($inner_type, bool) {
+            const fn clamp(value: $inner_type) -> ($inner_type, bool) {
                 if value < $min {
                     ($min, false)
                 } else if value > $max {

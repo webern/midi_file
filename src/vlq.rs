@@ -15,14 +15,6 @@ impl Vlq {
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
         encode_u32(self.bytes)
     }
-
-    pub(crate) fn try_from_bytes(b: &[u8]) -> std::result::Result<Self, VlqError> {
-        let temp = from_bytes(b)?;
-        if temp.len() != 1 {
-            return Err(VlqError::UnexpectedMultipleVlqs);
-        }
-        Ok(Self { bytes: temp[0] })
-    }
 }
 
 impl TryFrom<u64> for Vlq {
