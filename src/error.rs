@@ -53,6 +53,9 @@ pub(crate) enum LibError {
         source: TryFromIntError,
     },
 
+    #[snafu(display("{} The '{}' feature is not yet implemented", site, feature))]
+    Unimplemented { site: String, feature: String },
+
     #[snafu(display("{} Error while writing data: {}", site, source))]
     Write {
         site: String,
@@ -138,6 +141,16 @@ macro_rules! invalid_file {
     };
     ($fmt:expr, $($arg:expr),+) => {
         return invalid_file_r!($fmt, $($arg),+)
+    };
+}
+
+macro_rules! noimpl {
+    ($name:expr) => {
+        return crate::error::Unimplemented {
+            site: site!(),
+            feature: $name.to_string(),
+        }
+        .fail();
     };
 }
 

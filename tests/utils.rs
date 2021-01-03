@@ -1,6 +1,17 @@
+#![allow(dead_code)]
+
 use log::LevelFilter;
 use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Once;
+
+pub const ADESTE_FIDELES: &str = "adeste_fideles.mid";
+pub const AVE_MARIS_STELLA: &str = "ave_maris_stella.mid";
+pub const BARITONE_SAX: &str = "baritone_saxophone.error.mid";
+pub const B_GUAJEO: &str = "b_guajeo.mid";
+pub const LATER_FOLIA: &str = "later_folia.mid";
+pub const LOGIC_PRO: &str = "logic_pro.mid";
+pub const PHOBOS_DORICO: &str = "PHOBOS_DORICO.mid";
 
 static LOGGER: Once = Once::new();
 
@@ -23,4 +34,13 @@ fn logger_init() {
         })
         .filter(None, LevelFilter::Error)
         .init();
+}
+
+pub fn test_file<S: AsRef<str>>(filename: S) -> PathBuf {
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("data")
+        .join(filename.as_ref());
+    p.canonicalize()
+        .unwrap_or_else(|_| panic!("bad path '{}'", p.display()))
 }

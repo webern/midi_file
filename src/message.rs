@@ -198,7 +198,7 @@ impl Message {
                 return Ok(Message::ActiveSensing)
             }
             x if SystemRealtimeMessage::SystemReset as u8 == x => return Ok(Message::SystemReset),
-            0xf0 => panic!("TODO - parse sysex"),
+            0xf0 => noimpl!("sysex"),
             _ => {}
         }
         // now check if it is a channel voice message or channel mode message
@@ -217,11 +217,10 @@ impl Message {
                     program,
                 }))
             }
-            StatusType::ChannelPressure => panic!("{:?}", status_type),
-            StatusType::PitchBend => panic!("{:?}", status_type),
-            StatusType::System => panic!("{:?}", status_type),
+            StatusType::ChannelPressure => noimpl!("channel pressure"),
+            StatusType::PitchBend => noimpl!("pitch bend"),
+            StatusType::System => noimpl!("system"),
         }
-        // panic!("{:?}", status_type);
     }
 
     pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
@@ -231,30 +230,30 @@ impl Message {
             Message::PolyPressure(value) => value.write(w, StatusType::PolyPressure),
             Message::Control(value) => value.write(w),
             Message::ProgramChange(value) => value.write(w),
-            Message::ChannelPressure(_) => unimplemented!(),
-            Message::PitchBend(_) => unimplemented!(),
-            Message::AllSoundsOff(_) => unimplemented!(),
-            Message::ResetAllControllers(_) => unimplemented!(),
-            Message::LocalControlOff(_) => unimplemented!(),
-            Message::LocalControlOn(_) => unimplemented!(),
-            Message::AllNotesOff(_) => unimplemented!(),
-            Message::OmniModeOff(_) => unimplemented!(),
-            Message::OmniModeOn(_) => unimplemented!(),
-            Message::MonoModeOn(_) => unimplemented!(),
-            Message::PolyModeOn(_) => unimplemented!(),
-            Message::MidiTimeCodeQuarterFrame(_) => unimplemented!(),
-            Message::SongPositionPointer(_) => unimplemented!(),
-            Message::SongSelect(_) => unimplemented!(),
-            Message::TuneRequest => unimplemented!(),
-            Message::EndOfSysexFlag => unimplemented!(),
-            Message::TimingClock => unimplemented!(),
-            Message::Undefined1 => unimplemented!(),
-            Message::Start => unimplemented!(),
-            Message::Continue => unimplemented!(),
-            Message::Stop => unimplemented!(),
-            Message::Undefined2 => unimplemented!(),
-            Message::ActiveSensing => unimplemented!(),
-            Message::SystemReset => unimplemented!(),
+            Message::ChannelPressure(_) => noimpl!("ChannelPressure"),
+            Message::PitchBend(_) => noimpl!("PitchBend"),
+            Message::AllSoundsOff(_) => noimpl!("AllSoundsOff"),
+            Message::ResetAllControllers(_) => noimpl!("ResetAllControllers"),
+            Message::LocalControlOff(_) => noimpl!("LocalControlOff"),
+            Message::LocalControlOn(_) => noimpl!("LocalControlOn"),
+            Message::AllNotesOff(_) => noimpl!("AllNotesOff"),
+            Message::OmniModeOff(_) => noimpl!("OmniModeOff"),
+            Message::OmniModeOn(_) => noimpl!("OmniModeOn"),
+            Message::MonoModeOn(_) => noimpl!("MonoModeOn"),
+            Message::PolyModeOn(_) => noimpl!("PolyModeOn"),
+            Message::MidiTimeCodeQuarterFrame(_) => noimpl!("MidiTimeCodeQuarterFrame"),
+            Message::SongPositionPointer(_) => noimpl!("SongPositionPointer"),
+            Message::SongSelect(_) => noimpl!("SongSelect"),
+            Message::TuneRequest => noimpl!("TuneRequest"),
+            Message::EndOfSysexFlag => noimpl!("EndOfSysexFlag"),
+            Message::TimingClock => noimpl!("TimingClock"),
+            Message::Undefined1 => noimpl!("Undefined1"),
+            Message::Start => noimpl!("Start"),
+            Message::Continue => noimpl!("Continue"),
+            Message::Stop => noimpl!("Stop"),
+            Message::Undefined2 => noimpl!(""),
+            Message::ActiveSensing => noimpl!("ActiveSensing"),
+            Message::SystemReset => noimpl!("SystemReset"),
         }
     }
 }
@@ -295,7 +294,7 @@ fn parse_chanmod<R>(_it: &mut ByteIter<R>, _chan: Channel, _first_data: u8) -> L
 where
     R: Read,
 {
-    unimplemented!()
+    noimpl!("Channel Mode")
 }
 
 fn parse_control<R>(it: &mut ByteIter<R>, chan: Channel, first_data_byte: u8) -> LibResult<Message>

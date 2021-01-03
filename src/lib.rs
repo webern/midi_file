@@ -662,11 +662,11 @@ pub struct SysexEvent {
 
 impl SysexEvent {
     fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> LibResult<Self> {
-        unimplemented!()
+        noimpl!("SysexEvent::parse")
     }
 
     pub(crate) fn write<W: Write>(&self, _w: &mut W) -> LibResult<()> {
-        unimplemented!()
+        noimpl!("SysexEvent::write")
     }
 }
 
@@ -831,15 +831,15 @@ impl MetaEvent {
         iter.read_expect(0xff).context(io!())?;
         let meta_type_byte = iter.read_or_die().context(io!())?;
         match meta_type_byte {
-            META_SEQUENCE_NUM => unimplemented!(),
+            META_SEQUENCE_NUM => noimpl!("Meta Sequence Number"),
             META_TEXT..=META_DEVICE_NAME => MetaEvent::parse_text(iter),
-            META_CHAN_PREFIX => panic!("{:?}", MetaEvent::MidiChannelPrefix),
+            META_CHAN_PREFIX => noimpl!("Meta Channel Prefix"),
             META_END_OF_TRACK => Ok(MetaEvent::parse_end_of_track(iter)?),
             META_SET_TEMPO => Ok(MetaEvent::SetTempo(MicrosecondsPerQuarter::parse(iter)?)),
             META_SMTPE_OFFSET => Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?)),
             META_TIME_SIG => Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?)),
             META_KEY_SIG => Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?)),
-            META_SEQ_SPECIFIC => panic!("{:?}", MetaEvent::Sequencer),
+            META_SEQ_SPECIFIC => noimpl!("Meta Sequencer Specific"),
             _ => invalid_file!("unrecognized byte {:#04X}", meta_type_byte),
         }
     }
@@ -847,7 +847,7 @@ impl MetaEvent {
     pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
-            MetaEvent::SequenceNumber => unimplemented!(),
+            MetaEvent::SequenceNumber => noimpl!("Meta SequenceNumber"),
             MetaEvent::Text(s) => write_text(w, 0x01, s),
             MetaEvent::Copyright(s) => write_text(w, 0x02, s),
             MetaEvent::TrackName(s) => write_text(w, 0x03, s),
@@ -857,7 +857,7 @@ impl MetaEvent {
             MetaEvent::CuePoint(s) => write_text(w, 0x07, s),
             MetaEvent::ProgramName(s) => write_text(w, 0x08, s),
             MetaEvent::DeviceName(s) => write_text(w, 0x09, s),
-            MetaEvent::MidiChannelPrefix => unimplemented!(),
+            MetaEvent::MidiChannelPrefix => noimpl!("Meta MidiChannelPrefix"),
             MetaEvent::EndOfTrack => {
                 write_u8!(w, META_END_OF_TRACK)?;
                 write_u8!(w, LEN_META_END_OF_TRACK)?;
@@ -878,7 +878,7 @@ impl MetaEvent {
             MetaEvent::SmpteOffset(value) => value.write(w),
             MetaEvent::TimeSignature(value) => value.write(w),
             MetaEvent::KeySignature(value) => value.write(w),
-            MetaEvent::Sequencer => unimplemented!(),
+            MetaEvent::Sequencer => noimpl!("Meta Sequencer Specific"),
         }
     }
 
