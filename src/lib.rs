@@ -841,7 +841,7 @@ pub enum MetaEvent {
     /// normal MIDI event (which contains a channel) or the next MIDI Channel Prefix meta-event. If MIDI channels refer
     /// to "tracks", this message may help jam several tracks into a format 0 file, keeping their non-MIDI data
     /// associated with a track. This capability is also present in Yamaha's ESEQ file format.
-    MidiChannelPrefix, // TODO - value
+    MidiChannelPrefix(Channel),
 
     /// `FF 2F 00`: This event is not optional. It is included so that an exact ending point may be specified for the
     /// track, so that it has an exact length, which is necessary for tracks which are looped or concatenated.
@@ -913,7 +913,12 @@ impl MetaEvent {
         match meta_type_byte {
             META_SEQUENCE_NUM => noimpl!("Meta Sequence Number"),
             META_TEXT..=META_DEVICE_NAME => MetaEvent::parse_text(iter),
-            META_CHAN_PREFIX => noimpl!("Meta Channel Prefix"),
+            META_CHAN_PREFIX => {
+                iter.read_expect(LEN_META_CHAN_PREFIX).context(io!())?;
+                Ok(MetaEvent::MidiChannelPrefix(Channel::new(
+                    iter.read_or_die().context(io!())?,
+                )))
+            }
             META_END_OF_TRACK => Ok(MetaEvent::parse_end_of_track(iter)?),
             META_SET_TEMPO => Ok(MetaEvent::SetTempo(MicrosecondsPerQuarter::parse(iter)?)),
             META_SMTPE_OFFSET => Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?)),
@@ -937,7 +942,11 @@ impl MetaEvent {
             MetaEvent::CuePoint(s) => write_text(w, 0x07, s),
             MetaEvent::ProgramName(s) => write_text(w, 0x08, s),
             MetaEvent::DeviceName(s) => write_text(w, 0x09, s),
-            MetaEvent::MidiChannelPrefix => noimpl!("Meta MidiChannelPrefix"),
+            MetaEvent::MidiChannelPrefix(channel) => {
+                write_u8!(w, META_CHAN_PREFIX)?;
+                write_u8!(w, LEN_META_CHAN_PREFIX)?;
+                write_u8!(w, channel.get())
+            }
             MetaEvent::EndOfTrack => {
                 write_u8!(w, META_END_OF_TRACK)?;
                 write_u8!(w, LEN_META_END_OF_TRACK)?;

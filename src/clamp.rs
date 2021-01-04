@@ -1,4 +1,12 @@
-/// Example: clamp!(Channel, u8, 1, 16, 1, pub);
+// TODO - maybe use const generics instead when available
+/// Example: clamp!(Channel, u8, 0, 15, 0, pub);
+/// Where:
+/// - Channel is the name of the struct that will be created.
+/// - u8 is the underlying data type
+/// - 0 is the minimum allowed value (redundant in this case)
+/// - 15 is the maximum allowed value
+/// - 0 is the default value
+/// - pub is the visibility of the struct
 macro_rules! clamp {
     ($symbol:ident, $inner_type:ty, $min:expr, $max:expr, $default:expr, $visibility:vis) => {
         /// $inner_type value clamped to be between $min and $max.

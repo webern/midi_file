@@ -1,4 +1,4 @@
-use crate::error::{self, LibResult};
+use crate::error::LibResult;
 use std::convert::TryFrom;
 
 /// `0xFF`: File Spec: All meta-events begin with FF, then have an event type byte (which is always
@@ -63,7 +63,7 @@ impl StatusType {
             x if StatusType::ChannelPressure as u8 == x => Ok(StatusType::ChannelPressure),
             x if StatusType::PitchBend as u8 == x => Ok(StatusType::PitchBend),
             x if StatusType::System as u8 == x => Ok(StatusType::System),
-            _ => error::Other { site: site!() }.fail(),
+            _ => invalid_file!("unrecognized status byte {:#04X}", value),
         }
     }
 }

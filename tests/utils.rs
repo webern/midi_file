@@ -6,12 +6,14 @@ use std::path::PathBuf;
 use std::sync::Once;
 
 pub const ADESTE_FIDELES: &str = "adeste_fideles.mid";
+pub const ALS_DIE_ROEMER: &str = "als_die_roemer.mid";
 pub const AVE_MARIS_STELLA: &str = "ave_maris_stella.mid";
 pub const BARITONE_SAX: &str = "baritone_saxophone.error.mid";
 pub const B_GUAJEO: &str = "b_guajeo.mid";
 pub const LATER_FOLIA: &str = "later_folia.mid";
 pub const LOGIC_PRO: &str = "logic_pro.mid";
-pub const PHOBOS_DORICO: &str = "PHOBOS_DORICO.mid";
+pub const PHOBOS_DORICO: &str = "phobos_dorico.mid";
+pub const TOBEFREE: &str = "tobefree.mid";
 
 static LOGGER: Once = Once::new();
 

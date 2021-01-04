@@ -4,8 +4,8 @@ use midi::MidiFile;
 use std::fmt::{Debug, Display, Formatter};
 use tempfile::TempDir;
 use utils::{
-    enable_logging, test_file, ADESTE_FIDELES, AVE_MARIS_STELLA, BARITONE_SAX, B_GUAJEO,
-    LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO,
+    enable_logging, test_file, ADESTE_FIDELES, ALS_DIE_ROEMER, AVE_MARIS_STELLA, BARITONE_SAX,
+    B_GUAJEO, LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO, TOBEFREE,
 };
 
 type RtResult = std::result::Result<(), RtErr>;
@@ -160,6 +160,13 @@ fn adeste_fideles() {
     round_trip_test(ADESTE_FIDELES).unwrap();
 }
 
+// TODO - https://github.com/webern/midi/issues/1
+#[test]
+#[ignore]
+fn als_die_roemer() {
+    round_trip_test(ALS_DIE_ROEMER).unwrap();
+}
+
 #[test]
 fn ave_maris_stella() {
     round_trip_test(AVE_MARIS_STELLA).unwrap();
@@ -180,16 +187,21 @@ fn later_folia() {
     round_trip_test(LATER_FOLIA).unwrap();
 }
 
-// TODO - channel prefix
 #[test]
-#[ignore]
 fn logic_pro() {
     round_trip_test(LOGIC_PRO).unwrap();
 }
 
-// TODO - unrecognized status nibble
+// TODO - https://github.com/webern/midi/issues/1
 #[test]
 #[ignore]
 fn phobos_dorico() {
     round_trip_test(PHOBOS_DORICO).unwrap();
+}
+
+// TODO - https://github.com/webern/midi/issues/1
+#[test]
+#[ignore]
+fn tobeefree() {
+    round_trip_test(TOBEFREE).unwrap();
 }
