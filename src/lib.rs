@@ -31,8 +31,10 @@ use crate::error::LibResult;
 use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
 use crate::vlq::Vlq;
 pub use error::{Error, Result};
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use snafu::{ensure, OptionExt, ResultExt};
+use std::borrow::Cow;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 
 // https://www.music.mcgill.ca/~gary/306/week9/smf.html
@@ -371,7 +373,7 @@ impl Track {
     }
 
     pub fn set_name<S: Into<String>>(&mut self, name: S) -> Result<()> {
-        let name = name.into();
+        let name = Text::new(name);
         let meta = Event::Meta(MetaEvent::TrackName(name.clone()));
         if self.is_empty() {
             self.push_event(0, meta)?;
@@ -400,7 +402,7 @@ impl Track {
     }
 
     pub fn set_instrument_name<S: Into<String>>(&mut self, name: S) -> Result<()> {
-        let name = name.into();
+        let name = Text::new(name);
         let meta = Event::Meta(MetaEvent::InstrumentName(name.clone()));
         if self.is_empty() {
             self.push_event(0, meta)?;
@@ -514,7 +516,7 @@ impl Track {
     }
 
     pub fn push_lyric<S: Into<String>>(&mut self, delta_time: u32, lyric: S) -> Result<()> {
-        let lyric = Event::Meta(MetaEvent::Lyric(lyric.into()));
+        let lyric = Event::Meta(MetaEvent::Lyric(Text::new(lyric)));
         self.push_event(delta_time, lyric)
     }
 
@@ -683,6 +685,84 @@ impl Default for SysexEventType {
     }
 }
 
+/// The MIDI spec does not state what encoding should be used for strings. Since Rust strings are
+/// UTF-8 encoded, we try to parse text as a `String` and hope for the best. But if we get an error
+/// then we store the original bytes to facilitate lossless parsing.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub enum Text {
+    Utf8(String),
+    Other(Vec<u8>),
+}
+
+impl Default for Text {
+    fn default() -> Self {
+        Text::Utf8(String::new())
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Text::Utf8(s) => Display::fmt(s, f),
+            Text::Other(b) => write!(f, "{}", String::from_utf8_lossy(b)),
+        }
+    }
+}
+
+impl From<Vec<u8>> for Text {
+    fn from(bytes: Vec<u8>) -> Self {
+        match String::from_utf8(bytes.clone()) {
+            Ok(s) => Text::Utf8(s),
+            Err(_) => {
+                warn!("non UTF-8 string encountered, encoding unknown");
+                Text::Other(bytes)
+            }
+        }
+    }
+}
+
+impl From<String> for Text {
+    fn from(s: String) -> Self {
+        Text::Utf8(s)
+    }
+}
+
+impl From<&str> for Text {
+    fn from(s: &str) -> Self {
+        Text::Utf8(s.into())
+    }
+}
+
+/// Caution, this will be 'lossy' if the `Text` is not UTF-8 encoded.
+impl Into<String> for Text {
+    fn into(self) -> String {
+        match self {
+            Text::Utf8(s) => s,
+            Text::Other(b) => String::from_utf8_lossy(&b).into(),
+        }
+    }
+}
+
+impl Text {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        Text::Utf8(s.into())
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            Text::Utf8(s) => s.as_bytes(),
+            Text::Other(b) => b.as_slice(),
+        }
+    }
+
+    pub fn as_str(&self) -> Cow<'_, str> {
+        match self {
+            Text::Utf8(s) => Cow::Borrowed(s.as_str()),
+            Text::Other(b) => String::from_utf8_lossy(b),
+        }
+    }
+}
+
 /// Meta Events seem to only exist in the MIDI File Spec. Here is what it says about them:
 /// A few meta-events are defined herein. It is not required for every program to support every meta-event.
 ///
@@ -721,40 +801,40 @@ pub enum MetaEvent {
     ///
     /// Meta event types 01 through 0F are reserved for various types of text events, each of which meets the
     /// specification of text events(above) but is used for a different purpose:
-    Text(String),
+    OtherText(Text),
 
     /// `FF 02 len text`: Contains a copyright notice as printable ASCII text. The notice should contain the characters
     /// (C), the year of the copyright, and the owner of the copyright. If several pieces of music are in the same MIDI
     /// file, all of the copyright notices should be placed together in this event so that it will be at the beginning
     /// of the file. This event should be the first event in the first track chunk, at time 0.
-    Copyright(String),
+    Copyright(Text),
 
     /// `FF 03 len text`: If in a format 0 track, or the first track in a format 1 file, the name of the sequence.
     /// Otherwise, the name of the track.
-    TrackName(String),
+    TrackName(Text),
 
     /// `FF 04 len text`: A description of the type of instrumentation to be used in that track. May be used with the
     /// MIDI Prefix meta-event to specify which MIDI channel the description applies to, or the channel may be specified
     /// as text in the event itself.
-    InstrumentName(String),
+    InstrumentName(Text),
 
     /// `FF 05 len text`: A lyric to be sung. Generally, each syllable will be a separate lyric event which begins at
     /// the event's time.
-    Lyric(String),
+    Lyric(Text),
 
     /// `FF 06 len text`: Normally in a format 0 track, or the first track in a format 1 file. The name of that point in
     /// the sequence, such as a rehearsal letter or section name ("First Verse", etc.).
-    Marker(String),
+    Marker(Text),
 
     /// `FF 07 len text`: A description of something happening on a film or video screen or stage at that point in the
     /// musical score ("Car crashes into house", "curtain opens", "she slaps his face", etc.)
-    CuePoint(String),
+    CuePoint(Text),
 
     /// `FF 08 length text`: Weird, I found it here http://www.somascape.org/midi/tech/mfile.html
-    ProgramName(String),
+    ProgramName(Text),
 
     /// `FF 09 length text`: Weird, I found it here http://www.somascape.org/midi/tech/mfile.html
-    DeviceName(String),
+    DeviceName(Text),
 
     /// `FF 20 01 cc`: The MIDI channel (0-15) contained in this event may be used to associate a MIDI channel with all
     /// events which follow, including System Exclusive and meta-events. This channel is "effective" until the next
@@ -848,7 +928,7 @@ impl MetaEvent {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
             MetaEvent::SequenceNumber => noimpl!("Meta SequenceNumber"),
-            MetaEvent::Text(s) => write_text(w, 0x01, s),
+            MetaEvent::OtherText(s) => write_text(w, 0x01, s),
             MetaEvent::Copyright(s) => write_text(w, 0x02, s),
             MetaEvent::TrackName(s) => write_text(w, 0x03, s),
             MetaEvent::InstrumentName(s) => write_text(w, 0x04, s),
@@ -894,9 +974,9 @@ impl MetaEvent {
         let length = iter.read_vlq_u32().context(io!())?;
         let bytes = iter.read_n(length as usize).context(io!())?;
         // the spec does not strictly specify what encoding should be used for strings
-        let s = String::from_utf8_lossy(&bytes).to_string();
+        let s: Text = bytes.into();
         match text_type {
-            META_TEXT => Ok(MetaEvent::Text(s)),
+            META_TEXT => Ok(MetaEvent::OtherText(s)),
             META_COPYRIGHT => Ok(MetaEvent::Copyright(s)),
             META_TRACK_NAME => Ok(MetaEvent::TrackName(s)),
             META_INSTR_NAME => Ok(MetaEvent::InstrumentName(s)),
@@ -910,7 +990,7 @@ impl MetaEvent {
     }
 }
 
-fn write_text<W: Write>(w: &mut W, text_type: u8, text: &str) -> LibResult<()> {
+fn write_text<W: Write>(w: &mut W, text_type: u8, text: &Text) -> LibResult<()> {
     w.write_all(&text_type.to_be_bytes()).context(wr!())?;
     let bytes = text.as_bytes();
     let size_u32 = u32::try_from(bytes.len()).context(error::StringTooLong { site: site!() })?;

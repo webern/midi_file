@@ -2,6 +2,7 @@ use crate::byte_iter::ByteIter;
 use crate::channel::Channel;
 use crate::constants::StatusType;
 use crate::error::{self, LibResult};
+use log::warn;
 use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
@@ -73,20 +74,47 @@ pub struct PitchBendMessage {}
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ModeMessage {
-    AllSoundsOff,
-    ResetAllControllers,
-    LocalControl(bool),
-    AllNotesOff,
-    OmniModeOff,
-    OmniModeOn,
-    MonoModeOn(u8), // TODO - M, where M is the number of channels. ???
+    AllSoundsOff(Channel),
+    ResetAllControllers(Channel),
+    LocalControl(LocalControlValue),
+    AllNotesOff(Channel),
+    OmniModeOff(Channel),
+    OmniModeOn(Channel),
+    MonoModeOn(MonoModeOnValue),
     PolyModeOn,
+}
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum OnOff {
+    On = 127,
+    Off = 0,
+}
+
+impl Default for OnOff {
+    fn default() -> Self {
+        OnOff::Off
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct LocalControlValue {
+    channel: Channel,
+    on_off: OnOff,
 }
 
 impl Default for ModeMessage {
     fn default() -> Self {
-        ModeMessage::AllSoundsOff
+        ModeMessage::AllSoundsOff(Channel::new(0))
     }
+}
+
+clamp!(U7, u8, 0, 127, 0, pub);
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct MonoModeOnValue {
+    channel: Channel,
+    mono_mode_channels: U7,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -160,7 +188,7 @@ pub enum Message {
     AllNotesOff(Channel),
     OmniModeOff(Channel),
     OmniModeOn(Channel),
-    MonoModeOn(Channel), // TODO - M, where M is the number of channels. ??? Some type is needed here
+    MonoModeOn(MonoModeOnValue),
     PolyModeOn(Channel),
     MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage),
     SongPositionPointer(SongPositionPointerMessage),
@@ -232,15 +260,26 @@ impl Message {
             Message::ProgramChange(value) => value.write(w),
             Message::ChannelPressure(_) => noimpl!("ChannelPressure"),
             Message::PitchBend(_) => noimpl!("PitchBend"),
-            Message::AllSoundsOff(_) => noimpl!("AllSoundsOff"),
-            Message::ResetAllControllers(_) => noimpl!("ResetAllControllers"),
-            Message::LocalControlOff(_) => noimpl!("LocalControlOff"),
-            Message::LocalControlOn(_) => noimpl!("LocalControlOn"),
-            Message::AllNotesOff(_) => noimpl!("AllNotesOff"),
-            Message::OmniModeOff(_) => noimpl!("OmniModeOff"),
-            Message::OmniModeOn(_) => noimpl!("OmniModeOn"),
-            Message::MonoModeOn(_) => noimpl!("MonoModeOn"),
-            Message::PolyModeOn(_) => noimpl!("PolyModeOn"),
+            Message::AllSoundsOff(channel) => write_chanmod(w, *channel, CONTROL_ALL_SOUNDS_OFF, 0),
+            Message::ResetAllControllers(channel) => {
+                write_chanmod(w, *channel, CONTROL_RESET_ALL_CONTROLLERS, 0)
+            }
+            Message::LocalControlOff(channel) => {
+                write_chanmod(w, *channel, CONTROL_LOCAL_CONTROL, 0)
+            }
+            Message::LocalControlOn(channel) => {
+                write_chanmod(w, *channel, CONTROL_LOCAL_CONTROL, 127)
+            }
+            Message::AllNotesOff(channel) => write_chanmod(w, *channel, CONTROL_ALL_NOTES_OFF, 0),
+            Message::OmniModeOff(channel) => write_chanmod(w, *channel, CONTROL_OMNI_MODE_OFF, 0),
+            Message::OmniModeOn(channel) => write_chanmod(w, *channel, CONTROL_OMNI_MODE_ON, 0),
+            Message::MonoModeOn(m) => write_chanmod(
+                w,
+                m.channel,
+                CONTROL_MONO_MODE_ON,
+                m.mono_mode_channels.get(),
+            ),
+            Message::PolyModeOn(channel) => write_chanmod(w, *channel, CONTROL_POLY_MODE_ON, 0),
             Message::MidiTimeCodeQuarterFrame(_) => noimpl!("MidiTimeCodeQuarterFrame"),
             Message::SongPositionPointer(_) => noimpl!("SongPositionPointer"),
             Message::SongSelect(_) => noimpl!("SongSelect"),
@@ -257,6 +296,15 @@ impl Message {
         }
     }
 }
+
+pub(crate) const CONTROL_ALL_SOUNDS_OFF: u8 = 120;
+pub(crate) const CONTROL_RESET_ALL_CONTROLLERS: u8 = 121;
+pub(crate) const CONTROL_LOCAL_CONTROL: u8 = 122;
+pub(crate) const CONTROL_ALL_NOTES_OFF: u8 = 123;
+pub(crate) const CONTROL_OMNI_MODE_OFF: u8 = 124;
+pub(crate) const CONTROL_OMNI_MODE_ON: u8 = 125;
+pub(crate) const CONTROL_MONO_MODE_ON: u8 = 126;
+pub(crate) const CONTROL_POLY_MODE_ON: u8 = 127;
 
 /// Returns (4-bit status part, 4-bit channel).
 fn split_byte(status_byte: u8) -> LibResult<(StatusType, Channel)> {
@@ -290,11 +338,50 @@ fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Mes
     }
 }
 
-fn parse_chanmod<R>(_it: &mut ByteIter<R>, _chan: Channel, _first_data: u8) -> LibResult<Message>
+fn parse_chanmod<R>(it: &mut ByteIter<R>, chan: Channel, first_byte: u8) -> LibResult<Message>
 where
     R: Read,
 {
-    noimpl!("Channel Mode")
+    let second_byte = it.read_or_die().context(io!())?;
+    match first_byte {
+        CONTROL_ALL_SOUNDS_OFF => Ok(Message::AllSoundsOff(chan)),
+        CONTROL_RESET_ALL_CONTROLLERS => Ok(Message::ResetAllControllers(chan)),
+        CONTROL_LOCAL_CONTROL => {
+            if second_byte == 0 {
+                Ok(Message::LocalControlOff(chan))
+            } else {
+                if second_byte != 127 {
+                    warn!(
+                        "unexpected local control on value, {}, setting to 127",
+                        second_byte
+                    )
+                }
+                Ok(Message::LocalControlOn(chan))
+            }
+        }
+        CONTROL_ALL_NOTES_OFF => Ok(Message::AllNotesOff(chan)),
+        CONTROL_OMNI_MODE_OFF => Ok(Message::OmniModeOff(chan)),
+        CONTROL_OMNI_MODE_ON => Ok(Message::OmniModeOn(chan)),
+        CONTROL_MONO_MODE_ON => Ok(Message::MonoModeOn(MonoModeOnValue {
+            channel: chan,
+            mono_mode_channels: U7::new(second_byte),
+        })),
+        CONTROL_POLY_MODE_ON => Ok(Message::PolyModeOn(chan)),
+        _ => invalid_file!("Bad channel mode value {:#04X}", first_byte),
+    }
+}
+
+fn write_chanmod<W>(w: &mut W, channel: Channel, controller: u8, value: u8) -> LibResult<()>
+where
+    W: Write,
+{
+    debug_assert!(matches!(controller, 120..=127));
+    debug_assert!(matches!(value, 0..=127));
+    let status_byte = 0xB0u8 | channel.get();
+    write_u8!(w, status_byte)?;
+    write_u8!(w, controller)?;
+    write_u8!(w, value)?;
+    Ok(())
 }
 
 fn parse_control<R>(it: &mut ByteIter<R>, chan: Channel, first_data_byte: u8) -> LibResult<Message>

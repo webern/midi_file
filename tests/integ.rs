@@ -91,7 +91,7 @@ fn ave_maris_stella_finale_export() {
     } else {
         panic!("wrong variant, got {:?}", data);
     };
-    assert_eq!("SmartMusic SoftSynth 1", data);
+    assert_eq!("SmartMusic SoftSynth 1", data.as_str());
 
     // advance to the next event
     let track_event = events.next().unwrap();
@@ -107,7 +107,7 @@ fn ave_maris_stella_finale_export() {
     } else {
         panic!("wrong variant, got {:?}", data);
     };
-    assert_eq!("[Staff 1]", data);
+    assert_eq!("[Staff 1]", data.as_str());
 
     // advance to the next event
     let track_event = events.next().unwrap();

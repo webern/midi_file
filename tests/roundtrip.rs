@@ -4,8 +4,8 @@ use midi::MidiFile;
 use std::fmt::{Debug, Display, Formatter};
 use tempfile::TempDir;
 use utils::{
-    test_file, ADESTE_FIDELES, AVE_MARIS_STELLA, BARITONE_SAX, B_GUAJEO, LATER_FOLIA, LOGIC_PRO,
-    PHOBOS_DORICO,
+    enable_logging, test_file, ADESTE_FIDELES, AVE_MARIS_STELLA, BARITONE_SAX, B_GUAJEO,
+    LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO,
 };
 
 type RtResult = std::result::Result<(), RtErr>;
@@ -93,6 +93,7 @@ macro_rules! rtfail {
 
 /// Asserts that a well-formed file can be deserialized then serialized to the exact same bytes.
 fn round_trip_test<S: AsRef<str>>(filename: S) -> RtResult {
+    enable_logging();
     let td = TempDir::new().unwrap();
     let out_path = td.path().join("output.mid");
     let in_path = test_file(&filename);
@@ -143,6 +144,7 @@ impldebug!(BadFileTestError);
 
 /// Asserts that loading a malformed file will return an error.
 fn bad_file_test<S: AsRef<str>>(filename: S) -> BadFileTestResult {
+    enable_logging();
     match MidiFile::load(filename.as_ref()) {
         Ok(_) => Err(BadFileTestError {
             filename: filename.as_ref().into(),
@@ -153,9 +155,7 @@ fn bad_file_test<S: AsRef<str>>(filename: S) -> BadFileTestResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO - channel mode
 #[test]
-#[ignore]
 fn adeste_fideles() {
     round_trip_test(ADESTE_FIDELES).unwrap();
 }
@@ -165,9 +165,7 @@ fn ave_maris_stella() {
     round_trip_test(AVE_MARIS_STELLA).unwrap();
 }
 
-// TODO - channel mode
 #[test]
-#[ignore]
 fn b_guajeo() {
     round_trip_test(B_GUAJEO).unwrap();
 }

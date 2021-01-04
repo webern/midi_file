@@ -32,7 +32,7 @@ fn logger_init() {
                 record.args()
             )
         })
-        .filter(None, LevelFilter::Error)
+        .filter(None, LevelFilter::Warn)
         .init();
 }
 
