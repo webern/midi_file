@@ -10,4 +10,5 @@ mod time_signature;
 mod track;
 mod track_event;
 
+pub use division::Division;
 pub use header::{Format, Header};
