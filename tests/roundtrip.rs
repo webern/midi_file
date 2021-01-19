@@ -1,6 +1,6 @@
 mod utils;
 
-use midi::MidiFile;
+use midi_file::MidiFile;
 use std::fmt::{Debug, Display, Formatter};
 use tempfile::TempDir;
 use utils::{

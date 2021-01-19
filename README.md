@@ -54,3 +54,10 @@ You *do not* need to know what bytes equal what or what the bounds of an allowab
 This is all constrained with types.
 
 [example]: https://github.com/webern/midi/blob/main/examples/main.rs
+
+### Random Links
+
+Things I've been looking at from time-to-time:
+
+- https://www.music.mcgill.ca/~gary/306/week9/smf.html
+- https://github.com/Shkyrockett/midi-unit-test-cases
