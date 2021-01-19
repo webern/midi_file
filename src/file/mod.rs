@@ -5,8 +5,6 @@ These are kept separate from types and concepts that are also used in realtime M
 
 mod division;
 mod header;
-mod smpte_offset;
-mod time_signature;
 mod track;
 mod track_event;
 
