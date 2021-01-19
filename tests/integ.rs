@@ -1,7 +1,8 @@
 mod utils;
 
+use midi::core::DurationName;
 use midi::message::{Control, Message};
-use midi::{Clocks, Division, DurationName, Event, Format, MetaEvent, MidiFile};
+use midi::{Clocks, Division, Event, Format, MetaEvent, MidiFile};
 use std::fs::File;
 use std::io::Read;
 use utils::{enable_logging, test_file, AVE_MARIS_STELLA};

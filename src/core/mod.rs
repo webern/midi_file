@@ -7,4 +7,5 @@ mod clocks;
 mod duration_name;
 mod general_midi;
 
+pub use duration_name::DurationName;
 pub use general_midi::GeneralMidi;
