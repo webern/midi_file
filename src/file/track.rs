@@ -30,14 +30,14 @@ impl Track {
 
     pub fn push_event(&mut self, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32
-        self.events.push(TrackEvent { delta_time, event });
+        self.events.push(TrackEvent::new(delta_time, event));
         Ok(())
     }
 
     pub fn insert_event(&mut self, index: u32, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
         self.events
-            .insert(index as usize, TrackEvent { delta_time, event });
+            .insert(index as usize, TrackEvent::new(delta_time, event));
         Ok(())
     }
 
@@ -49,7 +49,7 @@ impl Track {
     ) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
         // std::mem::replace(&mut , TrackEvent{delta_time, event})
-        self.events[index as usize] = TrackEvent { delta_time, event };
+        self.events[index as usize] = TrackEvent::new(delta_time, event);
         Ok(())
     }
 
@@ -61,10 +61,10 @@ impl Track {
             return Ok(());
         }
         for (ix, event) in self.events.iter_mut().enumerate() {
-            if event.delta_time != 0 {
+            if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Meta(meta_event) = &event.event {
+            if let Event::Meta(meta_event) = event.event() {
                 if let MetaEvent::TrackName(s) = meta_event {
                     debug!("changing track name from '{}' to '{}'", s, name);
                     self.replace_event(ix as u32, 0, meta)?;
@@ -72,7 +72,7 @@ impl Track {
                 }
             }
 
-            if let Event::Meta(MetaEvent::TrackName(s)) = &event.event {
+            if let Event::Meta(MetaEvent::TrackName(s)) = event.event() {
                 debug!("changing track name from '{}' to '{}'", s, name);
                 self.replace_event(ix as u32, 0, meta)?;
                 return Ok(());
@@ -90,10 +90,10 @@ impl Track {
             return Ok(());
         }
         for (ix, event) in self.events.iter_mut().enumerate() {
-            if event.delta_time != 0 {
+            if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Meta(meta_event) = &event.event {
+            if let Event::Meta(meta_event) = event.event() {
                 if let MetaEvent::InstrumentName(s) = meta_event {
                     debug!("changing instrument name from '{}' to '{}'", s, name);
                     self.replace_event(ix as u32, 0, meta)?;
@@ -115,10 +115,10 @@ impl Track {
             return Ok(());
         }
         for (ix, event) in self.events.iter_mut().enumerate() {
-            if event.delta_time != 0 {
+            if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Midi(midi_event) = &event.event {
+            if let Event::Midi(midi_event) = event.event() {
                 if let Message::ProgramChange(prog) = midi_event {
                     debug!(
                         "changing program from '{}' to '{:?}'",
@@ -251,7 +251,7 @@ impl Track {
 /// the track already has an end-of-track event as its last event, then nothing happens.
 pub(crate) fn ensure_end_of_track(mut track: Track) -> LibResult<Track> {
     if let Some(last_event) = track.events.last() {
-        if !matches!(last_event.event, Event::Meta(MetaEvent::EndOfTrack)) {
+        if !matches!(last_event.event(), Event::Meta(MetaEvent::EndOfTrack)) {
             track.push_event(0, Event::Meta(MetaEvent::EndOfTrack))?;
         }
     } else {

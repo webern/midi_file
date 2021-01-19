@@ -28,10 +28,9 @@ pub mod message;
 pub mod vlq;
 
 pub use crate::channel::Channel;
-use crate::constants::{FILE_META_EVENT, FILE_SYSEX_F0, FILE_SYSEX_F7};
 use crate::error::LibResult;
 use crate::file::ensure_end_of_track;
-pub use crate::file::{Division, Format, Header, Track};
+pub use crate::file::{Division, Event, Format, Header, Track, TrackEvent};
 pub use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
 use crate::vlq::Vlq;
 pub use error::{Error, Result};
@@ -155,95 +154,7 @@ impl MidiFile {
     }
 }
 
-/// <MTrk event> = <delta-time> <event>
-#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
-pub struct TrackEvent {
-    // TODO - is u32 sufficient? what is the actual maximum value?
-    // http://www.ccarh.org/courses/253/handout/vlv/
-    /// <delta-time> is stored as a variable-length quantity. It represents the amount of time
-    /// before the following event. If the first event in a track occurs at the very beginning of a
-    /// track, or if two events occur simultaneously, a delta-time of zero is used. Delta-times are
-    /// always present. (Not storing delta-times of 0 requires at least two bytes for any other
-    /// value, and most delta-times aren't zero.) Delta-time is in ticks as specified in the header
-    /// chunk.
-    delta_time: u32,
-    event: Event,
-}
-
-impl TrackEvent {
-    fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        let delta_time = iter.read_vlq_u32().context(io!())?;
-        trace!("delta_time {}", delta_time);
-        let event = Event::parse(iter)?;
-        Ok(Self { delta_time, event })
-    }
-
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
-        let delta = Vlq::new(self.delta_time).to_bytes();
-        w.write_all(&delta).context(wr!())?;
-        self.event.write(w)
-    }
-
-    /// Returns true if the track event is a [`MetaEvent::EndOfTrack`].
-    pub(crate) fn is_end(&self) -> bool {
-        matches!(&self.event, Event::Meta(meta) if matches!(meta, MetaEvent::EndOfTrack))
-    }
-
-    pub fn delta_time(&self) -> u32 {
-        self.delta_time
-    }
-
-    pub fn event(&self) -> &Event {
-        &self.event
-    }
-}
-
-/// <event> = <MIDI event> | <sysex event> | <meta-event>
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
-pub enum Event {
-    /// <MIDI event> is any MIDI channel message. Running status is used.
-    Midi(Message),
-    /// <sysex event> is used to specify a MIDI system exclusive message.
-    Sysex(SysexEvent),
-    /// <meta-event> specifies non-MIDI information useful to this format or to sequencers.
-    Meta(MetaEvent),
-}
-
-impl Default for Event {
-    fn default() -> Self {
-        Event::Midi(Message::default())
-    }
-}
-
-impl Event {
-    fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        let status_byte = iter.peek_or_die().context(io!())?;
-        match status_byte {
-            FILE_SYSEX_F7 | FILE_SYSEX_F0 => {
-                Ok(Event::Sysex(SysexEvent::parse(status_byte, iter)?))
-            }
-            FILE_META_EVENT => {
-                trace!("I peeked at {:#x}, a MetaEvent!", status_byte);
-                Ok(Event::Meta(MetaEvent::parse(iter)?))
-            }
-            _ => {
-                trace!(
-                    "I peeked at {:#x}, neither a SysEx nor a MetaEvent, it must be a MIDI Message!",
-                    status_byte
-                );
-                Ok(Event::Midi(Message::parse(iter)?))
-            }
-        }
-    }
-
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
-        match self {
-            Event::Midi(md) => md.write(w),
-            Event::Sysex(sx) => sx.write(w),
-            Event::Meta(mt) => mt.write(w),
-        }
-    }
-}
+// TODO - move everything below here ///////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct SysexEvent {

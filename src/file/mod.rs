@@ -14,3 +14,4 @@ pub use division::Division;
 pub use header::{Format, Header};
 pub(crate) use track::ensure_end_of_track;
 pub use track::Track;
+pub use track_event::{Event, TrackEvent};
