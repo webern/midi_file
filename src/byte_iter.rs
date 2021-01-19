@@ -6,10 +6,9 @@ use std::io::{BufReader, Bytes, ErrorKind, Read};
 use std::path::{Path, PathBuf};
 use std::str::{from_utf8, Utf8Error};
 
-/// The internals are weird, it's basically a debugging thing to be able to see the next few falues
-/// at a breakpoint. Practically speaking, there is somewhere where I want to 're-read' the
-/// 'current' value, so at least the 'current' cached value is useful, but the various 'peeks'
-/// turned out to be unused.
+// TODO - make this less weird
+/// The internals are weird, it's basically a debugging thing to be able to see the next few values
+/// at a breakpoint.
 pub(crate) struct ByteIter<R: Read> {
     iter: Bytes<R>,
     position: Option<u64>,

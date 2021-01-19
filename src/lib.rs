@@ -22,13 +22,16 @@ mod byte_iter;
 pub mod channel;
 
 pub mod constants;
+mod core;
+mod file;
 pub mod message;
 pub mod vlq;
 
-use crate::channel::Channel;
+pub use crate::channel::Channel;
 use crate::constants::{FILE_META_EVENT, FILE_SYSEX_F0, FILE_SYSEX_F7};
 use crate::error::LibResult;
-use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
+pub use crate::file::{Format, Header};
+pub use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
 use crate::vlq::Vlq;
 pub use error::{Error, Result};
 use log::{debug, trace, warn};
@@ -37,9 +40,6 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 
-// https://www.music.mcgill.ca/~gary/306/week9/smf.html
-// https://github.com/Shkyrockett/midi-unit-test-cases
-
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct MidiFile {
     header: Header,
@@ -47,12 +47,9 @@ pub struct MidiFile {
 }
 
 impl MidiFile {
-    pub fn new(format: Format) -> Self {
+    pub fn new(format: Format, division: Division) -> Self {
         Self {
-            header: Header {
-                format,
-                division: Default::default(),
-            },
+            header: Header::new(format, division),
             tracks: Vec::new(),
         }
     }
@@ -147,10 +144,7 @@ impl MidiFile {
         let num_tracks = iter.read_u16().context(io!())?;
         let division_data = iter.read_u16().context(io!())?;
         let format = Format::from_u16(format_word)?;
-        let header = Header {
-            format,
-            division: Division::from_u16(division_data)?,
-        };
+        let header = Header::new(format, Division::from_u16(division_data)?);
         let mut tracks = Vec::new();
         for i in 0..num_tracks {
             trace!("parsing track chunk {} (zero-based) of {}", i, num_tracks);
@@ -160,7 +154,7 @@ impl MidiFile {
     }
 }
 
-/// When a track is pushed or inserted, we check to make sure the the last item is EndOfTrack.
+/// When a track is added, we check to make sure the the last item is [`EndOfTrack`], as required.
 fn ensure_end_of_track(mut track: Track) -> LibResult<Track> {
     if let Some(last_event) = track.events.last() {
         if !matches!(last_event.event, Event::Meta(MetaEvent::EndOfTrack)) {
@@ -170,77 +164,6 @@ fn ensure_end_of_track(mut track: Track) -> LibResult<Track> {
         track.push_event(0, Event::Meta(MetaEvent::EndOfTrack))?;
     }
     Ok(track)
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
-pub struct Header {
-    format: Format,
-    division: Division,
-}
-
-impl Header {
-    pub fn format(&self) -> &Format {
-        &self.format
-    }
-
-    pub fn division(&self) -> &Division {
-        &self.division
-    }
-
-    pub(crate) fn write<W: Write>(&self, w: &mut W, ntracks: u16) -> LibResult<()> {
-        // write the header chunk identifier
-        write!(w, "MThd").context(wr!())?;
-
-        // write the header chunk length (always 6)
-        w.write_all(&6u32.to_be_bytes()).context(wr!())?;
-
-        // write the format indicator
-        w.write_all(&(self.format as u16).to_be_bytes())
-            .context(wr!())?;
-
-        // write the number of tracks
-        w.write_all(&ntracks.to_be_bytes()).context(wr!())?;
-
-        // write the division value
-        self.division.write(w)?;
-        Ok(())
-    }
-}
-
-#[repr(u16)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
-pub enum Format {
-    /// 0 the file contains a single multi-channel track
-    Single = 0,
-    /// 1 the file contains one or more simultaneous tracks (or MIDI outputs) of a sequence
-    Multi = 1,
-    /// 2 the file contains one or more sequentially independent single-track patterns
-    Sequential = 2,
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Multi
-    }
-}
-
-impl Format {
-    pub(crate) fn from_u16(value: u16) -> LibResult<Self> {
-        match value {
-            0 => Ok(Format::Single),
-            1 => Ok(Format::Multi),
-            2 => Ok(Format::Sequential),
-            _ => error::Other { site: site!() }.fail(),
-        }
-    }
-}
-
-impl TryFrom<u16> for Format {
-    type Error = Error;
-
-    fn try_from(value: u16) -> Result<Self> {
-        Ok(Self::from_u16(value)?)
-    }
 }
 
 /// <division>, specifies the meaning of the delta-times. It has two formats, one for metrical time,
