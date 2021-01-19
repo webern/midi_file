@@ -5,3 +5,6 @@ These types and concepts could be used for realtime MIDI as well.
 
 mod clocks;
 mod duration_name;
+mod general_midi;
+
+pub use general_midi::GeneralMidi;
