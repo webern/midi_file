@@ -74,7 +74,7 @@ impl TryInto<u8> for Vlq {
 #[derive(Debug, PartialEq)]
 pub(crate) enum VlqError {
     // TODO - implement incomplete number check
-    //IncompleteNumber,
+    IncompleteNumber,
     Overflow,
 }
 
@@ -129,9 +129,15 @@ pub(crate) fn decode_slice(bytes: &[u8]) -> std::result::Result<u32, VlqError> {
             result <<= 7;
         }
         result ^= (b & 0x7F) as u32; // mask out MSB
+
+        // if this is the last byte, the continue bit should not be set
+        if i == bytes.len() - 1 {
+            if b & CONTINUE != 0 {
+                return Err(VlqError::IncompleteNumber);
+            }
+        }
     }
 
-    // TODO - implement incomplete number check
     Ok(result)
 }
 
@@ -186,17 +192,15 @@ mod tests {
         assert_eq!(x, e);
     }
 
-    // TODO - implement incomplete number check
-    // #[test]
-    // fn incomplete_0xff() {
-    //     error_test(&[0xff], VlqError::IncompleteNumber);
-    // }
+    #[test]
+    fn incomplete_0xff() {
+        error_test(&[0xff], VlqError::IncompleteNumber);
+    }
 
-    // TODO - implement incomplete number check
-    // #[test]
-    // fn incomplete_0x80() {
-    //     error_test(&[0x80], VlqError::IncompleteNumber);
-    // }
+    #[test]
+    fn incomplete_0x80() {
+        error_test(&[0x80], VlqError::IncompleteNumber);
+    }
 
     #[test]
     fn overflow_u32() {
