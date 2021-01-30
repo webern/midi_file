@@ -69,9 +69,9 @@ macro_rules! clamp {
             }
         }
 
-        impl Into<$inner_type> for $symbol {
-            fn into(self) -> $inner_type {
-                self.0
+        impl From<$symbol> for $inner_type {
+            fn from(value: $symbol) -> $inner_type {
+                value.0
             }
         }
 
