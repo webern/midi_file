@@ -4,16 +4,16 @@ use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub(crate) struct Vlq {
-    bytes: u32,
+    inner: u32,
 }
 
 impl Vlq {
     pub(crate) fn new(value: u32) -> Self {
-        Self { bytes: value }
+        Self { inner: value }
     }
 
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        encode_u32(self.bytes)
+        encode_u32(self.inner)
     }
 }
 
@@ -43,15 +43,15 @@ impl From<u8> for Vlq {
     }
 }
 
-impl Into<u64> for Vlq {
-    fn into(self) -> u64 {
-        self.bytes.into()
+impl From<Vlq> for u64 {
+    fn from(value: Vlq) -> u64 {
+        value.inner as u64
     }
 }
 
-impl Into<u32> for Vlq {
-    fn into(self) -> u32 {
-        self.bytes
+impl From<Vlq> for u32 {
+    fn from(value: Vlq) -> u32 {
+        value.inner
     }
 }
 
@@ -59,7 +59,7 @@ impl TryInto<u16> for Vlq {
     type Error = VlqError;
 
     fn try_into(self) -> Result<u16, Self::Error> {
-        u16::try_from(self.bytes).map_err(|_| VlqError::Overflow)
+        u16::try_from(self.inner).map_err(|_| VlqError::Overflow)
     }
 }
 
@@ -67,7 +67,7 @@ impl TryInto<u8> for Vlq {
     type Error = VlqError;
 
     fn try_into(self) -> Result<u8, Self::Error> {
-        u8::try_from(self.bytes).map_err(|_| VlqError::Overflow)
+        u8::try_from(self.inner).map_err(|_| VlqError::Overflow)
     }
 }
 
