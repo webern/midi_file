@@ -131,10 +131,8 @@ pub(crate) fn decode_slice(bytes: &[u8]) -> std::result::Result<u32, VlqError> {
         result ^= (b & 0x7F) as u32; // mask out MSB
 
         // if this is the last byte, the continue bit should not be set
-        if i == bytes.len() - 1 {
-            if b & CONTINUE != 0 {
-                return Err(VlqError::IncompleteNumber);
-            }
+        if i == bytes.len() - 1 && b & CONTINUE != 0 {
+            return Err(VlqError::IncompleteNumber);
         }
     }
 
