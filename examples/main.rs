@@ -1,5 +1,6 @@
 use midi_file::core::{Channel, Clocks, DurationName, GeneralMidi, NoteNumber, Velocity};
-use midi_file::{Division, Format, MidiFile, QuartersPerMinute, Track};
+use midi_file::file::{Division, Format, QuartersPerMinute, Track};
+use midi_file::MidiFile;
 
 // durations
 const QUARTER: u32 = 1024;

@@ -24,15 +24,11 @@ use std::path::Path;
 
 mod byte_iter;
 pub mod core;
-mod file;
+pub mod file;
 mod text;
 
 use crate::error::LibResult;
-use crate::file::ensure_end_of_track;
-pub use crate::file::{
-    Division, Event, Format, Header, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute,
-    SysexEvent, SysexEventType, TimeSignatureValue, Track, TrackEvent,
-};
+use crate::file::{ensure_end_of_track, Division, Format, Header, Track};
 pub use crate::text::Text;
 pub use error::{Error, Result};
 use log::trace;

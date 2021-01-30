@@ -4,10 +4,10 @@ use crate::core::{
     ProgramChangeValue, Velocity,
 };
 use crate::error::LibResult;
-use crate::{
-    Event, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, Text, TimeSignatureValue,
-    TrackEvent,
+use crate::file::{
+    Event, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue, TrackEvent,
 };
+use crate::Text;
 use log::{debug, trace};
 use snafu::ResultExt;
 use std::convert::TryFrom;
