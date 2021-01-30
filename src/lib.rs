@@ -26,7 +26,6 @@ pub mod channel;
 pub mod core;
 mod file;
 pub mod message;
-pub mod status_type;
 mod text;
 
 pub use crate::channel::Channel;
