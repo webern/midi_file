@@ -26,10 +26,8 @@ use std::path::Path;
 
 mod byte_iter;
 pub mod channel;
-
 pub mod core;
 mod file;
-pub mod message;
 mod text;
 
 use crate::error::LibResult;
@@ -38,7 +36,6 @@ pub use crate::file::{
     Division, Event, Format, Header, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute,
     SysexEvent, SysexEventType, TimeSignatureValue, Track, TrackEvent,
 };
-pub use crate::message::{Message, NoteMessage, ProgramChangeValue};
 pub use crate::text::Text;
 pub use error::{Error, Result};
 use log::trace;

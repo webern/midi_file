@@ -1,7 +1,8 @@
 use crate::byte_iter::ByteIter;
 use crate::core::vlq::Vlq;
+use crate::core::Message;
 use crate::error::LibResult;
-use crate::{Message, MetaEvent, SysexEvent};
+use crate::{MetaEvent, SysexEvent};
 use log::trace;
 use snafu::ResultExt;
 use std::io::{Read, Write};

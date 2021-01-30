@@ -68,6 +68,7 @@ pub struct PitchBendMessage {}
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum ModeMessage {
     AllSoundsOff(Channel),
     ResetAllControllers(Channel),
@@ -81,6 +82,7 @@ pub enum ModeMessage {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum OnOff {
     On = 127,
     Off = 0,
@@ -111,6 +113,7 @@ pub struct MonoModeOnValue {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum SystemCommonMessage {
     MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage),
     SongPositionPointer(SongPositionPointerMessage),
@@ -154,6 +157,7 @@ impl Default for SystemRealtimeMessage {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum SystemMessage {
     Common(SystemCommonMessage),
     Realtime(SystemRealtimeMessage),
