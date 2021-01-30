@@ -15,4 +15,4 @@ pub use duration_name::DurationName;
 pub use general_midi::GeneralMidi;
 pub use status_type::StatusType;
 
-pub use numbers::{Channel, NoteNumber, Program, Velocity, U7};
+pub use numbers::{Channel, ControlValue, NoteNumber, Program, Velocity, U7};

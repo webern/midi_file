@@ -1,5 +1,5 @@
 use crate::byte_iter::ByteIter;
-use crate::core::{Channel, NoteNumber, Program, StatusType, Velocity, U7};
+use crate::core::{Channel, ControlValue, NoteNumber, Program, StatusType, Velocity, U7};
 use crate::error::{self, LibResult};
 use log::warn;
 use snafu::ResultExt;
@@ -389,8 +389,6 @@ where
         value,
     }))
 }
-
-clamp!(ControlValue, u8, 0, 127, 0, pub);
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

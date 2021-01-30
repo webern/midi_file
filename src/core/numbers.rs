@@ -5,3 +5,4 @@ clamp!(NoteNumber, u8, 0, 127, 60, pub);
 clamp!(Velocity, u8, 0, 127, 72, pub);
 clamp!(Program, u8, 0, 127, 0, pub);
 clamp!(U7, u8, 0, 127, 0, pub);
+clamp!(ControlValue, u8, 0, 127, 0, pub);
