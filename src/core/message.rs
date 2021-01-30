@@ -10,6 +10,8 @@ pub(crate) trait WriteBytes {
     fn write<W: Write>(&self, w: &mut W) -> LibResult<()>;
 }
 
+/// Represents the data that is common, and required for both [`Message::NoteOn`] and
+/// [`Message::NoteOff`] messages.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NoteMessage {
     pub(crate) channel: Channel,
@@ -36,6 +38,8 @@ impl NoteMessage {
     }
 }
 
+/// Provides the ability to change an instrument (sound, patch, etc.) by specifying the affected
+/// channel number and the new program value.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ProgramChangeValue {
     pub(crate) channel: Channel,
@@ -43,10 +47,12 @@ pub struct ProgramChangeValue {
 }
 
 impl ProgramChangeValue {
+    /// Get the channel value.
     pub fn channel(&self) -> &Channel {
         &self.channel
     }
 
+    /// Get the program value.
     pub fn program(&self) -> &Program {
         &self.program
     }
@@ -60,12 +66,17 @@ impl WriteBytes for ProgramChangeValue {
     }
 }
 
+// TODO - unused?
+/// Maybe unused.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ChannelPressureMessage {}
 
+// TODO - unused?
+/// Maybe unused.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PitchBendMessage {}
 
+/// Some complicated MIDI thing.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]

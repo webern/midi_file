@@ -1,5 +1,8 @@
+/// `GeneralMidi` represents the standard set of instruments that are intended to be available by
+/// all MIDI implementations.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(missing_docs)]
 pub enum GeneralMidi {
     AcousticGrandPiano = 1,
     BrightAcousticPiano = 2,

@@ -2,6 +2,12 @@ use crate::error::LibResult;
 use crate::Error;
 use std::convert::TryFrom;
 
+/// `DurationName` is used when specifying the denominator of a [`TimeSignature`]. When defining
+/// time signatures, the MIDI file spec says:
+/// ```text
+/// The denominator is a negative power of two: 2 represents a quarter-note, 3 represents an'
+/// eighth-note, etc.
+/// ```
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub enum DurationName {
@@ -35,7 +41,7 @@ pub enum DurationName {
     /// Five-Twelfth Note
     D512 = 9,
 
-    /// One Thousand, Twenty-Fourth Note
+    /// One Thousand Twenty-Fourth Note
     D1024 = 10,
 }
 
