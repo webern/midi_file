@@ -25,7 +25,6 @@ use std::io::{BufWriter, Read, Write};
 use std::path::Path;
 
 mod byte_iter;
-pub mod channel;
 pub mod core;
 mod file;
 mod text;
