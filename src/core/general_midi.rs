@@ -275,3 +275,9 @@ impl From<u8> for GeneralMidi {
         }
     }
 }
+
+impl From<GeneralMidi> for u8 {
+    fn from(gm: GeneralMidi) -> Self {
+        gm as u8
+    }
+}
