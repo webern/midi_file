@@ -1,6 +1,5 @@
 use crate::byte_iter::ByteIter;
-use crate::channel::Channel;
-use crate::core::StatusType;
+use crate::core::{Channel, NoteNumber, Program, StatusType, Velocity, U7};
 use crate::error::{self, LibResult};
 use log::warn;
 use snafu::ResultExt;
@@ -36,10 +35,6 @@ impl NoteMessage {
         Ok(())
     }
 }
-
-clamp!(NoteNumber, u8, 0, 127, 60, pub);
-clamp!(Velocity, u8, 0, 127, 72, pub);
-clamp!(Program, u8, 0, 127, 0, pub);
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ProgramChangeValue {
@@ -108,8 +103,6 @@ impl Default for ModeMessage {
         ModeMessage::AllSoundsOff(Channel::new(0))
     }
 }
-
-clamp!(U7, u8, 0, 127, 0, pub);
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonoModeOnValue {

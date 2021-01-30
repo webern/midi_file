@@ -1,7 +1,11 @@
+// one per line to simplify commenting certain ones out during development
+#![deny(arithmetic_overflow)]
 #![deny(clippy::complexity)]
 #![deny(clippy::perf)]
 #![deny(clippy::style)]
 #![deny(dead_code)]
+// #![deny(missing_crate_level_docs)]
+// #![deny(missing_docs)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
 #![deny(unreachable_patterns)]
@@ -28,14 +32,13 @@ mod file;
 pub mod message;
 mod text;
 
-pub use crate::channel::Channel;
 use crate::error::LibResult;
 use crate::file::ensure_end_of_track;
 pub use crate::file::{
     Division, Event, Format, Header, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute,
     SysexEvent, SysexEventType, TimeSignatureValue, Track, TrackEvent,
 };
-pub use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
+pub use crate::message::{Message, NoteMessage, ProgramChangeValue};
 pub use crate::text::Text;
 pub use error::{Error, Result};
 use log::trace;

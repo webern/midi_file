@@ -1,9 +1,9 @@
 use crate::byte_iter::ByteIter;
 use crate::core::vlq::Vlq;
-use crate::core::{Clocks, DurationName};
+use crate::core::{Channel, Clocks, DurationName};
 use crate::error::{self, LibResult};
 use crate::Result;
-use crate::{Channel, Text};
+use crate::Text;
 use snafu::{ensure, OptionExt, ResultExt};
 use std::convert::TryFrom;
 use std::io::{Read, Write};

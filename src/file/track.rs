@@ -1,9 +1,9 @@
 use crate::byte_iter::ByteIter;
-use crate::core::{Clocks, DurationName, GeneralMidi};
+use crate::core::{Channel, Clocks, DurationName, GeneralMidi, NoteNumber, Program, Velocity};
 use crate::error::LibResult;
 use crate::{
-    Channel, Event, Message, MetaEvent, MicrosecondsPerQuarter, NoteMessage, NoteNumber, Program,
-    ProgramChangeValue, QuartersPerMinute, Text, TimeSignatureValue, TrackEvent, Velocity,
+    Event, Message, MetaEvent, MicrosecondsPerQuarter, NoteMessage, ProgramChangeValue,
+    QuartersPerMinute, Text, TimeSignatureValue, TrackEvent,
 };
 use log::{debug, trace};
 use snafu::ResultExt;
