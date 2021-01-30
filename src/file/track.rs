@@ -141,12 +141,7 @@ impl Track {
         denominator: DurationName,
         click: Clocks,
     ) -> crate::Result<()> {
-        let time_sig = TimeSignatureValue {
-            numerator,
-            denominator,
-            click,
-            ..TimeSignatureValue::default()
-        };
+        let time_sig = TimeSignatureValue::new(numerator, denominator, click)?;
         let event = Event::Meta(MetaEvent::TimeSignature(time_sig));
         self.push_event(delta_time, event)
     }

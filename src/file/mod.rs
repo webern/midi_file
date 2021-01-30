@@ -5,12 +5,14 @@ These are kept separate from types and concepts that are also used in realtime M
 
 mod division;
 mod header;
+mod meta_event;
 mod sysex;
 mod track;
 mod track_event;
 
 pub use division::Division;
 pub use header::{Format, Header};
+pub use meta_event::{MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue};
 pub use sysex::{SysexEvent, SysexEventType};
 pub(crate) use track::ensure_end_of_track;
 pub use track::Track;
