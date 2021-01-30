@@ -1,16 +1,6 @@
 use crate::error::LibResult;
 use std::convert::TryFrom;
 
-/// `0xFF`: File Spec: All meta-events begin with FF, then have an event type byte (which is always
-/// less than 128)
-pub(crate) const FILE_META_EVENT: u8 = 0b1111_1111;
-
-/// `0xF0`: File Spec: `F0 <length> <bytes to be transmitted after F0>`
-pub(crate) const FILE_SYSEX_F0: u8 = 0b1111_0000;
-
-/// `0xF7`: File Spec: `F7 <length> <all bytes to be transmitted>`
-pub(crate) const FILE_SYSEX_F7: u8 = 0b1111_0111;
-
 /// Represents the status byte types in Table I "Summary of Status Bytes" from the MIDI
 /// specification.
 #[repr(u8)]

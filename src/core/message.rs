@@ -1,6 +1,5 @@
 use crate::byte_iter::ByteIter;
-use crate::channel::Channel;
-use crate::constants::StatusType;
+use crate::core::{Channel, ControlValue, NoteNumber, Program, StatusType, Velocity, U7};
 use crate::error::{self, LibResult};
 use log::warn;
 use snafu::ResultExt;
@@ -11,6 +10,8 @@ pub(crate) trait WriteBytes {
     fn write<W: Write>(&self, w: &mut W) -> LibResult<()>;
 }
 
+/// Represents the data that is common, and required for both [`Message::NoteOn`] and
+/// [`Message::NoteOff`] messages.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NoteMessage {
     pub(crate) channel: Channel,
@@ -37,10 +38,8 @@ impl NoteMessage {
     }
 }
 
-clamp!(NoteNumber, u8, 0, 127, 60, pub);
-clamp!(Velocity, u8, 0, 127, 72, pub);
-clamp!(Program, u8, 0, 127, 0, pub);
-
+/// Provides the ability to change an instrument (sound, patch, etc.) by specifying the affected
+/// channel number and the new program value.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ProgramChangeValue {
     pub(crate) channel: Channel,
@@ -48,10 +47,12 @@ pub struct ProgramChangeValue {
 }
 
 impl ProgramChangeValue {
+    /// Get the channel value.
     pub fn channel(&self) -> &Channel {
         &self.channel
     }
 
+    /// Get the program value.
     pub fn program(&self) -> &Program {
         &self.program
     }
@@ -65,14 +66,20 @@ impl WriteBytes for ProgramChangeValue {
     }
 }
 
+// TODO - unused?
+/// Maybe unused.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ChannelPressureMessage {}
 
+// TODO - unused?
+/// Maybe unused.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct PitchBendMessage {}
 
+/// Some complicated MIDI thing.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum ModeMessage {
     AllSoundsOff(Channel),
     ResetAllControllers(Channel),
@@ -86,6 +93,7 @@ pub enum ModeMessage {
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum OnOff {
     On = 127,
     Off = 0,
@@ -109,8 +117,6 @@ impl Default for ModeMessage {
     }
 }
 
-clamp!(U7, u8, 0, 127, 0, pub);
-
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonoModeOnValue {
     channel: Channel,
@@ -118,6 +124,7 @@ pub struct MonoModeOnValue {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum SystemCommonMessage {
     MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage),
     SongPositionPointer(SongPositionPointerMessage),
@@ -161,6 +168,7 @@ impl Default for SystemRealtimeMessage {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(dead_code)]
 pub enum SystemMessage {
     Common(SystemCommonMessage),
     Realtime(SystemRealtimeMessage),
@@ -396,8 +404,6 @@ where
         value,
     }))
 }
-
-clamp!(ControlValue, u8, 0, 127, 0, pub);
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

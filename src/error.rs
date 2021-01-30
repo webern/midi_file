@@ -1,3 +1,5 @@
+//! The `error` module provides the error type used throughout the library.
+
 use snafu::Snafu;
 use std::num::TryFromIntError;
 use std::path::PathBuf;

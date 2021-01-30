@@ -1,10 +1,13 @@
 use crate::byte_iter::ByteIter;
-use crate::core::{Clocks, DurationName, GeneralMidi};
-use crate::error::LibResult;
-use crate::{
-    Channel, Event, Message, MetaEvent, MicrosecondsPerQuarter, NoteMessage, NoteNumber, Program,
-    ProgramChangeValue, QuartersPerMinute, Text, TimeSignatureValue, TrackEvent, Velocity,
+use crate::core::{
+    Channel, Clocks, DurationName, GeneralMidi, Message, NoteMessage, NoteNumber, Program,
+    ProgramChangeValue, Velocity,
 };
+use crate::error::LibResult;
+use crate::file::{
+    Event, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue, TrackEvent,
+};
+use crate::Text;
 use log::{debug, trace};
 use snafu::ResultExt;
 use std::convert::TryFrom;
@@ -141,12 +144,7 @@ impl Track {
         denominator: DurationName,
         click: Clocks,
     ) -> crate::Result<()> {
-        let time_sig = TimeSignatureValue {
-            numerator,
-            denominator,
-            click,
-            ..TimeSignatureValue::default()
-        };
+        let time_sig = TimeSignatureValue::new(numerator, denominator, click)?;
         let event = Event::Meta(MetaEvent::TimeSignature(time_sig));
         self.push_event(delta_time, event)
     }
