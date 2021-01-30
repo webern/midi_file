@@ -6,6 +6,7 @@ These types and concepts could be used for realtime MIDI as well.
 mod clocks;
 mod duration_name;
 mod general_midi;
+pub(crate) mod vlq;
 
 pub use clocks::Clocks;
 pub use duration_name::DurationName;

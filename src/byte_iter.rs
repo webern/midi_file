@@ -1,4 +1,4 @@
-use crate::vlq::{decode_slice, VlqError, CONTINUE};
+use crate::core::vlq::{decode_slice, VlqError, CONTINUE};
 use log::trace;
 use snafu::{ensure, OptionExt, ResultExt, Snafu};
 use std::fs::File;

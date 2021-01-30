@@ -1,7 +1,7 @@
 use crate::byte_iter::ByteIter;
 use crate::constants::{FILE_META_EVENT, FILE_SYSEX_F0, FILE_SYSEX_F7};
+use crate::core::vlq::Vlq;
 use crate::error::LibResult;
-use crate::vlq::Vlq;
 use crate::{Message, MetaEvent, SysexEvent};
 use log::trace;
 use snafu::ResultExt;

@@ -25,15 +25,16 @@ pub mod constants;
 pub mod core;
 mod file;
 pub mod message;
-pub mod vlq;
 
 pub use crate::channel::Channel;
+use crate::core::vlq::Vlq;
 use crate::core::{Clocks, DurationName};
 use crate::error::LibResult;
 use crate::file::ensure_end_of_track;
-pub use crate::file::{Division, Event, Format, Header, Track, TrackEvent};
+pub use crate::file::{
+    Division, Event, Format, Header, SysexEvent, SysexEventType, Track, TrackEvent,
+};
 pub use crate::message::{Message, NoteMessage, NoteNumber, Program, ProgramChangeValue, Velocity};
-use crate::vlq::Vlq;
 pub use error::{Error, Result};
 use log::{trace, warn};
 use snafu::{ensure, OptionExt, ResultExt};
@@ -156,35 +157,6 @@ impl MidiFile {
 }
 
 // TODO - move everything below here ///////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
-pub struct SysexEvent {
-    t: SysexEventType,
-    data: Vec<u8>,
-}
-
-impl SysexEvent {
-    fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> LibResult<Self> {
-        noimpl!("SysexEvent::parse")
-    }
-
-    pub(crate) fn write<W: Write>(&self, _w: &mut W) -> LibResult<()> {
-        noimpl!("SysexEvent::write")
-    }
-}
-
-#[repr(u8)]
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
-pub enum SysexEventType {
-    F0 = 0xf0,
-    F7 = 0xf7,
-}
-
-impl Default for SysexEventType {
-    fn default() -> Self {
-        SysexEventType::F0
-    }
-}
 
 /// The MIDI spec does not state what encoding should be used for strings. Since Rust strings are
 /// UTF-8 encoded, we try to parse text as a `String` and hope for the best. But if we get an error
