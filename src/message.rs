@@ -1,7 +1,7 @@
 use crate::byte_iter::ByteIter;
 use crate::channel::Channel;
-use crate::constants::StatusType;
 use crate::error::{self, LibResult};
+use crate::status_type::StatusType;
 use log::warn;
 use snafu::ResultExt;
 use std::convert::TryFrom;

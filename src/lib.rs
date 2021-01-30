@@ -23,10 +23,10 @@ use std::path::Path;
 mod byte_iter;
 pub mod channel;
 
-pub mod constants;
 pub mod core;
 mod file;
 pub mod message;
+pub mod status_type;
 mod text;
 
 pub use crate::channel::Channel;
