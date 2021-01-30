@@ -1,3 +1,8 @@
+//! The `text` module provides the `Text` type, which is not a MIDI-specific concept. MIDI
+//! recommends any text be encoded as ASCII, but there is not enforcement. We provide a `Text` type
+//! that holds a `UTF-8` `String` whenever possible, but reverts to holding raw bytes when the bytes
+//! are not valid `UTF-8`.
+
 use log::warn;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};

@@ -1,3 +1,5 @@
+//! The `byte_iter` module provides a wrapper for iterating over the bytes of a MIDI file.
+
 use crate::core::vlq::{decode_slice, VlqError, CONTINUE};
 use log::trace;
 use snafu::{ensure, OptionExt, ResultExt, Snafu};

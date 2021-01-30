@@ -15,8 +15,6 @@
 #[macro_use]
 mod error;
 #[macro_use]
-mod clamp;
-#[macro_use]
 mod macros;
 
 use crate::byte_iter::ByteIter;
