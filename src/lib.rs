@@ -27,10 +27,12 @@ use std::path::Path;
 mod byte_iter;
 pub mod core;
 pub mod file;
+mod scribe;
 mod text;
 
 use crate::error::LibResult;
 use crate::file::{ensure_end_of_track, Division, Format, Header, Track};
+use crate::scribe::{Scribe, ScribeSettings};
 pub use crate::text::Text;
 pub use error::{Error, Result};
 use log::trace;
@@ -64,9 +66,10 @@ impl MidiFile {
     pub fn write<W: Write>(&self, w: &mut W) -> Result<()> {
         let ntracks =
             u16::try_from(self.tracks.len()).context(error::TooManyTracks { site: site!() })?;
-        self.header.write(w, ntracks)?;
+        let mut scribe = Scribe::new(w, ScribeSettings::default());
+        self.header.write(&mut scribe, ntracks)?;
         for track in self.tracks() {
-            track.write(w)?;
+            track.write(&mut scribe)?;
         }
         Ok(())
     }
@@ -77,8 +80,9 @@ impl MidiFile {
             site: site!(),
             path,
         })?;
-        let mut w = BufWriter::new(file);
-        self.write(&mut w)
+        let w = BufWriter::new(file);
+        let mut scribe = Scribe::new(w, ScribeSettings::default());
+        self.write(&mut scribe)
     }
 
     pub fn header(&self) -> &Header {

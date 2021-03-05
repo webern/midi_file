@@ -2,6 +2,7 @@ use crate::byte_iter::ByteIter;
 use crate::core::vlq::Vlq;
 use crate::core::{Channel, Clocks, DurationName, PortValue};
 use crate::error::{self, LibResult};
+use crate::scribe::Scribe;
 use crate::{Result, Text};
 use snafu::{ensure, OptionExt, ResultExt};
 use std::convert::TryFrom;
@@ -181,7 +182,7 @@ impl MetaEvent {
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
             MetaEvent::SequenceNumber => noimpl!("Meta SequenceNumber"),
@@ -256,7 +257,7 @@ impl MetaEvent {
     }
 }
 
-fn write_text<W: Write>(w: &mut W, text_type: u8, text: &Text) -> LibResult<()> {
+fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> LibResult<()> {
     w.write_all(&text_type.to_be_bytes()).context(wr!())?;
     let bytes = text.as_bytes();
     let size_u32 = u32::try_from(bytes.len()).context(error::StringTooLong { site: site!() })?;
@@ -290,7 +291,7 @@ impl SmpteOffsetValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         write_u8!(w, META_SMTPE_OFFSET)?;
         write_u8!(w, LEN_META_SMTPE_OFFSET)?;
         write_u8!(w, self.hr)?;
@@ -388,7 +389,7 @@ impl TimeSignatureValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         write_u8!(w, META_TIME_SIG)?;
         write_u8!(w, LEN_META_TIME_SIG)?;
         write_u8!(w, self.numerator)?;
@@ -434,7 +435,7 @@ impl KeySignatureValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         write_u8!(w, META_KEY_SIG)?;
         write_u8!(w, LEN_META_KEY_SIG)?;
         write_u8!(w, self.accidentals.get() as u8)?;

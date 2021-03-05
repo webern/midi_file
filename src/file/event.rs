@@ -3,6 +3,7 @@ use crate::core::vlq::Vlq;
 use crate::core::Message;
 use crate::error::LibResult;
 use crate::file::{MetaEvent, SysexEvent};
+use crate::scribe::Scribe;
 use log::trace;
 use snafu::ResultExt;
 use std::io::{Read, Write};
@@ -55,7 +56,7 @@ impl Event {
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         match self {
             Event::Midi(md) => md.write(w),
             Event::Sysex(sx) => sx.write(w),
@@ -100,7 +101,7 @@ impl TrackEvent {
         Ok(Self { delta_time, event })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         let delta = Vlq::new(self.delta_time).to_bytes();
         w.write_all(&delta).context(wr!())?;
         self.event.write(w)
