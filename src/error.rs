@@ -37,6 +37,9 @@ pub(crate) enum LibError {
         source: crate::byte_iter::ByteError,
     },
 
+    #[snafu(display("{} Expected a running status byte but found none", site))]
+    RunningStatus { site: String },
+
     #[snafu(display("{} The string is too long and overflows a u32: {}", site, source))]
     StringTooLong {
         site: String,
