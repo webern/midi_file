@@ -1,5 +1,5 @@
 use midi_file::core::{Channel, Clocks, DurationName, GeneralMidi, NoteNumber, Velocity};
-use midi_file::file::{Division, Format, QuartersPerMinute, Track};
+use midi_file::file::{QuartersPerMinute, Track};
 use midi_file::MidiFile;
 
 // durations
@@ -19,7 +19,7 @@ const V: Velocity = Velocity::new(64);
 const CH: Channel = Channel::new(0);
 
 fn main() {
-    let mut mfile = MidiFile::new(Format::Multi, Division::default());
+    let mut mfile = MidiFile::new();
 
     // set up track metadata
     let mut track = Track::default();

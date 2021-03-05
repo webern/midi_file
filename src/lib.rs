@@ -39,30 +39,107 @@ use log::trace;
 use snafu::{ensure, ResultExt};
 use std::fs::File;
 
+/// Optionally provide settings to the [`MidiFile`]. This is a 'builder' struct.
+///
+/// # Example
+/// ```
+/// use midi_file::{MidiFile, Settings};
+/// use midi_file::file::{Format, Division};
+///
+/// let settings = Settings::new()
+///     .running_status(true)
+///     .format(Format::Single)
+///     .divisions(Division::QuarterNote(244));
+/// let _m = MidiFile::new_with_settings(settings);
+/// ```
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub struct Settings {
+    /// The type of MIDI file. Defaults to `1`, i.e. `Multi`.
+    format: Format,
+    /// Defaults to a reasonable QuarterNote value.
+    division: Division,
+    /// Whether or not we should omit redundant status bytes.
+    running_status: bool,
+}
+
+impl Settings {
+    /// Create a `Settings` object with default settings.
+    pub fn new() -> Self {
+        Self {
+            format: Format::default(),
+            division: Division::default(),
+            running_status: false,
+        }
+    }
+
+    /// Set the `running_status` setting. When this is `true`, the [`MidiFile`] will not write
+    /// redundant status bytes.
+    pub fn running_status(mut self, value: bool) -> Self {
+        self.running_status = value;
+        self
+    }
+
+    /// Set the `format` setting. MIDI files can be one of three types, see [`Format`].
+    pub fn format(mut self, value: Format) -> Self {
+        self.format = value;
+        self
+    }
+
+    /// Set the `division` setting, see [`Division`].
+    pub fn divisions(mut self, value: Division) -> Self {
+        self.division = value;
+        self
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct MidiFile {
+    settings: Settings,
     header: Header,
     tracks: Vec<Track>,
 }
 
+impl Default for MidiFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MidiFile {
-    pub fn new(format: Format, division: Division) -> Self {
+    /// Create a new `MidiFile` with reasonable default [`Settings`].
+    pub fn new() -> Self {
+        Self::new_with_settings(Settings::new())
+    }
+
+    /// Create a new `MidiFile` with customizable [`Settings`].
+    pub fn new_with_settings(settings: Settings) -> Self {
+        let header = Header::new(settings.format, settings.division);
         Self {
-            header: Header::new(format, division),
+            settings: Settings::new(),
+            header,
             tracks: Vec::new(),
         }
     }
 
+    /// Read a `MidiFile` from bytes.
     pub fn read<R: Read>(r: R) -> Result<Self> {
         let bytes = r.bytes();
         let iter = ByteIter::new(bytes).context(io!())?;
         Ok(Self::read_inner(iter)?)
     }
 
+    /// Load a `MidiFile` from a file path.
     pub fn load<P: AsRef<Path>>(file: P) -> Result<Self> {
         Ok(Self::read_inner(ByteIter::new_file(file).context(io!())?)?)
     }
 
+    /// Write a `MidiFile` to bytes.
     pub fn write<W: Write>(&self, w: &mut W) -> Result<()> {
         let ntracks =
             u16::try_from(self.tracks.len()).context(error::TooManyTracks { site: site!() })?;
@@ -74,6 +151,7 @@ impl MidiFile {
         Ok(())
     }
 
+    /// Save a `MidiFile` to a file path.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path = path.as_ref();
         let file = File::create(&path).context(error::Create {
@@ -151,6 +229,10 @@ impl MidiFile {
             trace!("parsing track chunk {} (zero-based) of {}", i, num_tracks);
             tracks.push(Track::parse(&mut iter)?)
         }
-        Ok(Self { header, tracks })
+        Ok(Self {
+            settings: Settings::new(),
+            header,
+            tracks,
+        })
     }
 }
