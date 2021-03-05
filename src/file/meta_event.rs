@@ -1,9 +1,8 @@
 use crate::byte_iter::ByteIter;
 use crate::core::vlq::Vlq;
-use crate::core::{Channel, Clocks, DurationName};
+use crate::core::{Channel, Clocks, DurationName, PortValue};
 use crate::error::{self, LibResult};
-use crate::Result;
-use crate::Text;
+use crate::{Result, Text};
 use snafu::{ensure, OptionExt, ResultExt};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
@@ -144,6 +143,9 @@ pub enum MetaEvent {
     /// which elects to use this as its only file format; sequencers with their established feature-specific formats
     /// should probably stick to the standard features when using this format.
     Sequencer, // TODO - value
+
+    /// `FF 0x21 0x01 value`: https://mido.readthedocs.io/en/latest/meta_message_types.html
+    Port(PortValue),
 }
 
 impl Default for MetaEvent {
@@ -171,6 +173,10 @@ impl MetaEvent {
             META_TIME_SIG => Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?)),
             META_KEY_SIG => Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?)),
             META_SEQ_SPECIFIC => noimpl!("Meta Sequencer Specific"),
+            META_PORT => Ok(MetaEvent::Port(PortValue::new({
+                iter.read_expect(1).context(io!())?;
+                iter.read_or_die().context(io!())?
+            }))),
             _ => invalid_file!("unrecognized byte {:#04X}", meta_type_byte),
         }
     }
@@ -214,6 +220,11 @@ impl MetaEvent {
             MetaEvent::TimeSignature(value) => value.write(w),
             MetaEvent::KeySignature(value) => value.write(w),
             MetaEvent::Sequencer => noimpl!("Meta Sequencer Specific"),
+            MetaEvent::Port(value) => {
+                write_u8!(w, META_PORT)?;
+                write_u8!(w, 1)?;
+                write_u8!(w, value.get())
+            }
         }
     }
 
@@ -307,6 +318,9 @@ pub(crate) const META_SMTPE_OFFSET: u8 = 0x54;
 pub(crate) const META_TIME_SIG: u8 = 0x58;
 pub(crate) const META_KEY_SIG: u8 = 0x59;
 pub(crate) const META_SEQ_SPECIFIC: u8 = 0x7f;
+/// https://groups.google.com/u/2/g/comp.music.midi/c/_MIjgi-8xQQ
+/// http://www.verycomputer.com/47_f2ad3c41e745127b_1.htm
+pub(crate) const META_PORT: u8 = 0x21;
 
 // #[allow(dead_code)] // TODO - implement
 pub(crate) const LEN_META_CHAN_PREFIX: u8 = 1;

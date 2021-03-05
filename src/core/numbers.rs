@@ -6,3 +6,4 @@ clamp!(Velocity, u8, 0, 127, 72, pub);
 clamp!(Program, u8, 0, 127, 0, pub);
 clamp!(U7, u8, 0, 127, 0, pub);
 clamp!(ControlValue, u8, 0, 127, 0, pub);
+clamp!(PortValue, u8, 0, 15, 0, pub);
