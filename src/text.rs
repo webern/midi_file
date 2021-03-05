@@ -56,9 +56,9 @@ impl From<&str> for Text {
 }
 
 /// Caution, this will be 'lossy' if the `Text` is not UTF-8 encoded.
-impl Into<String> for Text {
-    fn into(self) -> String {
-        match self {
+impl From<Text> for String {
+    fn from(t: Text) -> Self {
+        match t {
             Text::Utf8(s) => s,
             Text::Other(b) => String::from_utf8_lossy(&b).into(),
         }

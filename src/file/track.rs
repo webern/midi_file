@@ -67,14 +67,6 @@ impl Track {
             if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Meta(meta_event) = event.event() {
-                if let MetaEvent::TrackName(s) = meta_event {
-                    debug!("changing track name from '{}' to '{}'", s, name);
-                    self.replace_event(ix as u32, 0, meta)?;
-                    return Ok(());
-                }
-            }
-
             if let Event::Meta(MetaEvent::TrackName(s)) = event.event() {
                 debug!("changing track name from '{}' to '{}'", s, name);
                 self.replace_event(ix as u32, 0, meta)?;
@@ -96,12 +88,10 @@ impl Track {
             if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Meta(meta_event) = event.event() {
-                if let MetaEvent::InstrumentName(s) = meta_event {
-                    debug!("changing instrument name from '{}' to '{}'", s, name);
-                    self.replace_event(ix as u32, 0, meta)?;
-                    return Ok(());
-                }
+            if let Event::Meta(MetaEvent::InstrumentName(s)) = event.event() {
+                debug!("changing instrument name from '{}' to '{}'", s, name);
+                self.replace_event(ix as u32, 0, meta)?;
+                return Ok(());
             }
         }
         self.insert_event(0, 0, meta)?;
@@ -121,16 +111,14 @@ impl Track {
             if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Midi(midi_event) = event.event() {
-                if let Message::ProgramChange(prog) = midi_event {
-                    debug!(
-                        "changing program from '{}' to '{:?}'",
-                        prog.program.get(),
-                        value
-                    );
-                    self.replace_event(ix as u32, 0, program_change)?;
-                    return Ok(());
-                }
+            if let Event::Midi(Message::ProgramChange(prog)) = event.event() {
+                debug!(
+                    "changing program from '{}' to '{:?}'",
+                    prog.program.get(),
+                    value
+                );
+                self.replace_event(ix as u32, 0, program_change)?;
+                return Ok(());
             }
         }
         self.insert_event(0, 0, program_change)?;
