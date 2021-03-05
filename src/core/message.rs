@@ -1,6 +1,7 @@
 use crate::byte_iter::ByteIter;
 use crate::core::{Channel, ControlValue, NoteNumber, Program, StatusType, Velocity, U7};
 use crate::error::{self, LibResult};
+use crate::scribe::Scribe;
 use log::trace;
 use log::warn;
 use snafu::{OptionExt, ResultExt};
@@ -8,7 +9,7 @@ use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 pub(crate) trait WriteBytes {
-    fn write<W: Write>(&self, w: &mut W) -> LibResult<()>;
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()>;
 }
 
 /// Represents the data that is common, and required for both [`Message::NoteOn`] and
@@ -29,7 +30,7 @@ impl NoteMessage {
         })
     }
 
-    fn write<W: Write>(&self, w: &mut W, st: StatusType) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>, st: StatusType) -> LibResult<()> {
         write_status_byte(w, st, self.channel)?;
         w.write_all(&self.note_number.get().to_be_bytes())
             .context(wr!())?;
@@ -60,7 +61,7 @@ impl ProgramChangeValue {
 }
 
 impl WriteBytes for ProgramChangeValue {
-    fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         write_status_byte(w, StatusType::Program, self.channel)?;
         write_u8!(w, self.program.get())?;
         Ok(())
@@ -273,7 +274,7 @@ impl Message {
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         match self {
             Message::NoteOff(value) => value.write(w, StatusType::NoteOff),
             Message::NoteOn(value) => value.write(w, StatusType::NoteOn),
@@ -346,9 +347,13 @@ fn merge_byte(status: StatusType, channel: Channel) -> u8 {
 }
 
 /// Combines then writes the status part and channel part of a channel voice message.
-fn write_status_byte<W: Write>(w: &mut W, status: StatusType, channel: Channel) -> LibResult<()> {
+fn write_status_byte<W: Write>(
+    w: &mut Scribe<W>,
+    status: StatusType,
+    channel: Channel,
+) -> LibResult<()> {
     let data = merge_byte(status, channel);
-    write_u8!(w, data)
+    w.write_status_byte(data)
 }
 
 fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Message> {
@@ -393,14 +398,14 @@ where
     }
 }
 
-fn write_chanmod<W>(w: &mut W, channel: Channel, controller: u8, value: u8) -> LibResult<()>
+fn write_chanmod<W>(w: &mut Scribe<W>, channel: Channel, controller: u8, value: u8) -> LibResult<()>
 where
     W: Write,
 {
     debug_assert!(matches!(controller, 120..=127));
     debug_assert!(matches!(value, 0..=127));
     let status_byte = 0xB0u8 | channel.get();
-    write_u8!(w, status_byte)?;
+    w.write_status_byte(status_byte)?;
     write_u8!(w, controller)?;
     write_u8!(w, value)?;
     Ok(())
@@ -720,7 +725,7 @@ impl ControlChangeValue {
 }
 
 impl WriteBytes for ControlChangeValue {
-    fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         write_status_byte(w, StatusType::ControlOrSelectChannelMode, self.channel)?;
         write_u8!(w, self.control as u8)?;
         write_u8!(w, self.value.get())?;

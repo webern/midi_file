@@ -1,5 +1,6 @@
 use crate::byte_iter::ByteIter;
 use crate::error::LibResult;
+use crate::scribe::Scribe;
 use std::io::{Read, Write};
 
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
@@ -13,7 +14,7 @@ impl SysexEvent {
         noimpl!("SysexEvent::parse")
     }
 
-    pub(crate) fn write<W: Write>(&self, _w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, _w: &mut Scribe<W>) -> LibResult<()> {
         noimpl!("SysexEvent::write")
     }
 }

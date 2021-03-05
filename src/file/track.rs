@@ -7,6 +7,7 @@ use crate::error::LibResult;
 use crate::file::{
     Event, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue, TrackEvent,
 };
+use crate::scribe::{Scribe, ScribeSettings};
 use crate::Text;
 use log::{debug, trace};
 use snafu::ResultExt;
@@ -212,14 +213,15 @@ impl Track {
         Ok(Self { events })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         // write the track chunk header
         w.write_all(b"MTrk").context(wr!())?;
 
         // we need to write out all of the data first so we know its length
         let mut track_data: Vec<u8> = Vec::new();
+        let mut track_scribe = Scribe::new(&mut track_data, ScribeSettings::default());
         for event in self.events() {
-            event.write(&mut track_data)?;
+            event.write(&mut track_scribe)?;
         }
 
         // write the length of the track

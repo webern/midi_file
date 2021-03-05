@@ -1,4 +1,5 @@
 use crate::error::LibResult;
+use crate::scribe::Scribe;
 use crate::Error;
 use snafu::ResultExt;
 use std::convert::TryFrom;
@@ -34,7 +35,7 @@ impl Division {
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         match self {
             Division::QuarterNote(q) => Ok(w.write_all(&q.to_be_bytes()).context(wr!())?),
             Division::Smpte(_) => crate::error::Other { site: site!() }.fail(),

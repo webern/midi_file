@@ -1,4 +1,5 @@
 use crate::error::LibResult;
+use crate::scribe::Scribe;
 use crate::{Division, Error};
 use snafu::ResultExt;
 use std::convert::TryFrom;
@@ -23,7 +24,7 @@ impl Header {
         &self.division
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut W, ntracks: u16) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>, ntracks: u16) -> LibResult<()> {
         // write the header chunk identifier
         write!(w, "MThd").context(wr!())?;
 
