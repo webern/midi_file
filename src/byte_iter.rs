@@ -21,6 +21,7 @@ pub(crate) struct ByteIter<R: Read> {
     position_limit: Option<u64>,
     /// To help with 'running status', you can save a byte you need to remember here.
     latest_message_byte: Option<u8>,
+    running_status_detected: bool,
 }
 
 #[derive(Debug, Snafu)]
@@ -107,6 +108,7 @@ impl<R: Read> ByteIter<R> {
             peek3,
             position_limit: None,
             latest_message_byte: None,
+            running_status_detected: false,
         })
     }
 
@@ -328,6 +330,14 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn latest_message_byte(&self) -> Option<u8> {
         self.latest_message_byte
+    }
+
+    pub(crate) fn set_running_status_detected(&mut self) {
+        self.running_status_detected = true;
+    }
+
+    pub(crate) fn is_running_status_detected(&self) -> bool {
+        self.running_status_detected
     }
 }
 
