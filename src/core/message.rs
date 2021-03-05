@@ -1,8 +1,9 @@
 use crate::byte_iter::ByteIter;
 use crate::core::{Channel, ControlValue, NoteNumber, Program, StatusType, Velocity, U7};
 use crate::error::{self, LibResult};
+use log::trace;
 use log::warn;
-use snafu::ResultExt;
+use snafu::{OptionExt, ResultExt};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
@@ -221,7 +222,20 @@ impl Default for Message {
 
 impl Message {
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        let byte = iter.read_or_die().context(io!())?;
+        // check if the first byte is a status byte. if not, then this should be a running status
+        // message.
+        let byte = if matches!(iter.peek_or_die().context(io!())?, 0x00..=0x7F) {
+            let running_status = iter
+                .latest_message_byte()
+                .context(error::RunningStatus { site: site!() })?;
+            trace!("running status byte {:#x}", running_status);
+            running_status
+        } else {
+            let byte = iter.read_or_die().context(io!())?;
+            iter.set_latest_message_byte(Some(byte));
+            byte
+        };
+
         // first check if the message is a sysex or realtime message (using the whole byte).
         match byte {
             x if SystemRealtimeMessage::TimingClock as u8 == x => return Ok(Message::TimingClock),
