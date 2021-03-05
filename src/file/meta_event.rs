@@ -127,7 +127,8 @@ pub enum MetaEvent {
     /// `FF 59 02 sf mi`:
     /// ```text
     /// sf = -7: 7 flats
-    /// sf = -1: 1 flat sf=0: keyofC
+    /// sf = -1: 1 flat
+    /// sf=0: keyofC
     /// sf =  1: 1 sharp
     /// sf =  7: 7 sharps
     /// -----------------
