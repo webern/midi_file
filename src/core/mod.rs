@@ -15,5 +15,5 @@ pub use clocks::Clocks;
 pub use duration_name::DurationName;
 pub use general_midi::GeneralMidi;
 pub use message::{Control, Message, NoteMessage, ProgramChangeValue};
-pub use numbers::{Channel, ControlValue, NoteNumber, Program, Velocity, U7};
+pub use numbers::{Channel, ControlValue, NoteNumber, PortValue, Program, Velocity, U7};
 pub use status_type::StatusType;
