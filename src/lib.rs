@@ -100,9 +100,9 @@ impl Default for Settings {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct MidiFile {
-    settings: Settings,
     header: Header,
     tracks: Vec<Track>,
+    running_status: bool,
 }
 
 impl Default for MidiFile {
@@ -119,11 +119,10 @@ impl MidiFile {
 
     /// Create a new `MidiFile` with customizable [`Settings`].
     pub fn new_with_settings(settings: Settings) -> Self {
-        let header = Header::new(settings.format, settings.division);
         Self {
-            settings: Settings::new(),
-            header,
+            header: Header::new(settings.format, settings.division),
             tracks: Vec::new(),
+            running_status: settings.running_status,
         }
     }
 
@@ -143,7 +142,12 @@ impl MidiFile {
     pub fn write<W: Write>(&self, w: &mut W) -> Result<()> {
         let ntracks =
             u16::try_from(self.tracks.len()).context(error::TooManyTracks { site: site!() })?;
-        let mut scribe = Scribe::new(w, ScribeSettings::default());
+        let mut scribe = Scribe::new(
+            w,
+            ScribeSettings {
+                running_status: self.running_status,
+            },
+        );
         self.header.write(&mut scribe, ntracks)?;
         for track in self.tracks() {
             track.write(&mut scribe)?;
@@ -159,7 +163,12 @@ impl MidiFile {
             path,
         })?;
         let w = BufWriter::new(file);
-        let mut scribe = Scribe::new(w, ScribeSettings::default());
+        let mut scribe = Scribe::new(
+            w,
+            ScribeSettings {
+                running_status: self.running_status,
+            },
+        );
         self.write(&mut scribe)
     }
 
@@ -230,7 +239,7 @@ impl MidiFile {
             tracks.push(Track::parse(&mut iter)?)
         }
         Ok(Self {
-            settings: Settings::new(),
+            running_status: iter.is_running_status_detected(),
             header,
             tracks,
         })

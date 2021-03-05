@@ -226,6 +226,7 @@ impl Message {
         // check if the first byte is a status byte. if not, then this should be a running status
         // message.
         let byte = if matches!(iter.peek_or_die().context(io!())?, 0x00..=0x7F) {
+            iter.set_running_status_detected();
             let running_status = iter
                 .latest_message_byte()
                 .context(error::RunningStatus { site: site!() })?;

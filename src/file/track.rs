@@ -219,7 +219,12 @@ impl Track {
 
         // we need to write out all of the data first so we know its length
         let mut track_data: Vec<u8> = Vec::new();
-        let mut track_scribe = Scribe::new(&mut track_data, ScribeSettings::default());
+        let mut track_scribe = Scribe::new(
+            &mut track_data,
+            ScribeSettings {
+                running_status: w.use_running_status(),
+            },
+        );
         for event in self.events() {
             event.write(&mut track_scribe)?;
         }

@@ -51,7 +51,7 @@ impl<W: Write> Scribe<W> {
     /// If the `running_status` setting is true, and a previous status byte has been written, then
     /// the previous status byte is returned.
     pub(crate) fn running_status(&self) -> Option<u8> {
-        if self.settings.running_status {
+        if self.use_running_status() {
             self.running_status_byte
         } else {
             None
@@ -61,8 +61,13 @@ impl<W: Write> Scribe<W> {
     /// If the `running_status` setting is true, sets the `running_status_byte`, otherwise does
     /// nothing.
     pub(crate) fn set_running_status(&mut self, value: u8) {
-        if self.settings.running_status {
+        if self.use_running_status() {
             self.running_status_byte = Some(value)
         }
+    }
+
+    /// Returns true if the settings are set to use `running_status`.
+    pub(crate) fn use_running_status(&self) -> bool {
+        self.settings.running_status
     }
 }
