@@ -1,7 +1,7 @@
 mod utils;
 
 use midi_file::core::{Clocks, Control, DurationName, Message};
-use midi_file::file::{Division, Event, Format, MetaEvent};
+use midi_file::file::{Division, Event, Format, MetaEvent, QuarterNoteDivision};
 use midi_file::MidiFile;
 use std::fs::File;
 use std::io::Read;
@@ -12,7 +12,10 @@ fn ave_maris_stella_finale_export() {
     enable_logging();
     let midi_file = MidiFile::load(test_file(AVE_MARIS_STELLA)).unwrap();
     assert_eq!(*midi_file.header().format(), Format::Multi);
-    assert_eq!(*midi_file.header().division(), Division::QuarterNote(1024));
+    assert_eq!(
+        *midi_file.header().division(),
+        Division::QuarterNote(QuarterNoteDivision::new(1024))
+    );
     assert_eq!(midi_file.tracks_len(), 2);
     let mut tracks = midi_file.tracks();
     let track = tracks.next().unwrap();

@@ -44,12 +44,12 @@ use std::fs::File;
 /// # Example
 /// ```
 /// use midi_file::{MidiFile, Settings};
-/// use midi_file::file::{Format, Division};
+/// use midi_file::file::{Format, Division, QuarterNoteDivision};
 ///
 /// let settings = Settings::new()
 ///     .running_status(true)
 ///     .format(Format::Single)
-///     .divisions(Division::QuarterNote(244));
+///     .divisions(Division::QuarterNote(QuarterNoteDivision::new(244)));
 /// let _m = MidiFile::new_with_settings(settings);
 /// ```
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
