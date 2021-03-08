@@ -5,21 +5,33 @@ use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::Write;
 
-/// <division>, specifies the meaning of the delta-times. It has two formats, one for metrical time,
-/// and one for time-code-based time:
+clamp!(
+    /// The allowable values for [`Division`] when using the quarter note method. It is a positive
+    /// `u14` and thus has the range 1 to 16,383. The default value is 1024.
+    QuarterNoteDivision,
+    u16,
+    1,
+    16383,
+    1024,
+    pub
+);
+
+/// Specifies the meaning of the delta-times. It has two formats, one for metrical time, and one for
+/// time-code-based time:
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub enum Division {
     /// If bit 15 of <division> is a zero, the bits 14 thru 0 represent the number of delta-time
     /// "ticks" which make up a quarter-note. For instance, if <division> is 96, then a time
     /// interval of an eighth-note between two events in the file would be 48.
-    QuarterNote(u16), // TODO - clamp this to the allowable range
-    /// Frame rate and resolution within the frame.
+    QuarterNote(QuarterNoteDivision),
+    /// Frame rate and resolution within the frame. Caution, this may not be implemented correctly.
+    /// https://github.com/webern/midi_file/issues/11
     Smpte(SmpteRate),
 }
 
 impl Default for Division {
     fn default() -> Self {
-        Division::QuarterNote(1024)
+        Division::QuarterNote(QuarterNoteDivision::default())
     }
 }
 
@@ -31,13 +43,13 @@ impl Division {
             // TODO - implement SMPTE division
             crate::error::Other { site: site!() }.fail()
         } else {
-            Ok(Division::QuarterNote(value))
+            Ok(Division::QuarterNote(QuarterNoteDivision::new(value)))
         }
     }
 
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         match self {
-            Division::QuarterNote(q) => Ok(w.write_all(&q.to_be_bytes()).context(wr!())?),
+            Division::QuarterNote(q) => Ok(w.write_all(&q.get().to_be_bytes()).context(wr!())?),
             Division::Smpte(_) => crate::error::Other { site: site!() }.fail(),
         }
     }
