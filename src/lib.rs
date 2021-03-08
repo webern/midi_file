@@ -98,6 +98,8 @@ impl Default for Settings {
     }
 }
 
+/// Represents a MIDI file, which consists of a header identifying the type of MIDI file, and tracks
+/// with MIDI data.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct MidiFile {
     header: Header,

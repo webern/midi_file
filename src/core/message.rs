@@ -1,5 +1,7 @@
 use crate::byte_iter::ByteIter;
-use crate::core::{Channel, ControlValue, NoteNumber, Program, StatusType, Velocity, U7};
+use crate::core::{
+    Channel, ControlValue, MonoModeChannels, NoteNumber, Program, StatusType, Velocity,
+};
 use crate::error::{self, LibResult};
 use crate::scribe::Scribe;
 use log::trace;
@@ -122,7 +124,7 @@ impl Default for ModeMessage {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonoModeOnValue {
     channel: Channel,
-    mono_mode_channels: U7,
+    mono_mode_channels: MonoModeChannels,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -250,7 +252,7 @@ impl Message {
                 return Ok(Message::ActiveSensing)
             }
             x if SystemRealtimeMessage::SystemReset as u8 == x => return Ok(Message::SystemReset),
-            0xf0 => noimpl!("sysex"),
+            0xf0 => noimpl!("sysex: https://github.com/webern/midi_file/issues/7"),
             _ => {}
         }
         // now check if it is a channel voice message or channel mode message
@@ -269,9 +271,13 @@ impl Message {
                     program,
                 }))
             }
-            StatusType::ChannelPressure => noimpl!("channel pressure"),
-            StatusType::PitchBend => noimpl!("pitch bend"),
-            StatusType::System => noimpl!("system"),
+            StatusType::ChannelPressure => {
+                noimpl!("channel pressure: https://github.com/webern/midi_file/issues/X")
+            }
+            StatusType::PitchBend => {
+                noimpl!("pitch bend: https://github.com/webern/midi_file/issues/10")
+            }
+            StatusType::System => noimpl!("system: https://github.com/webern/midi_file/issues/10"),
         }
     }
 
@@ -282,8 +288,12 @@ impl Message {
             Message::PolyPressure(value) => value.write(w, StatusType::PolyPressure),
             Message::Control(value) => value.write(w),
             Message::ProgramChange(value) => value.write(w),
-            Message::ChannelPressure(_) => noimpl!("ChannelPressure"),
-            Message::PitchBend(_) => noimpl!("PitchBend"),
+            Message::ChannelPressure(_) => {
+                noimpl!("ChannelPressure: https://github.com/webern/midi_file/issues/X")
+            }
+            Message::PitchBend(_) => {
+                noimpl!("PitchBend: https://github.com/webern/midi_file/issues/10")
+            }
             Message::AllSoundsOff(channel) => write_chanmod(w, *channel, CONTROL_ALL_SOUNDS_OFF, 0),
             Message::ResetAllControllers(channel) => {
                 write_chanmod(w, *channel, CONTROL_RESET_ALL_CONTROLLERS, 0)
@@ -304,19 +314,37 @@ impl Message {
                 m.mono_mode_channels.get(),
             ),
             Message::PolyModeOn(channel) => write_chanmod(w, *channel, CONTROL_POLY_MODE_ON, 0),
-            Message::MidiTimeCodeQuarterFrame(_) => noimpl!("MidiTimeCodeQuarterFrame"),
-            Message::SongPositionPointer(_) => noimpl!("SongPositionPointer"),
-            Message::SongSelect(_) => noimpl!("SongSelect"),
-            Message::TuneRequest => noimpl!("TuneRequest"),
-            Message::EndOfSysexFlag => noimpl!("EndOfSysexFlag"),
-            Message::TimingClock => noimpl!("TimingClock"),
-            Message::Undefined1 => noimpl!("Undefined1"),
-            Message::Start => noimpl!("Start"),
-            Message::Continue => noimpl!("Continue"),
-            Message::Stop => noimpl!("Stop"),
+            Message::MidiTimeCodeQuarterFrame(_) => {
+                noimpl!("MidiTimeCodeQuarterFrame: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::SongPositionPointer(_) => {
+                noimpl!("SongPositionPointer: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::SongSelect(_) => {
+                noimpl!("SongSelect: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::TuneRequest => {
+                noimpl!("TuneRequest: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::EndOfSysexFlag => {
+                noimpl!("EndOfSysexFlag: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::TimingClock => {
+                noimpl!("TimingClock: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::Undefined1 => {
+                noimpl!("Undefined1: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::Start => noimpl!("Start: https://github.com/webern/midi_file/issues/10"),
+            Message::Continue => noimpl!("Continue: https://github.com/webern/midi_file/issues/10"),
+            Message::Stop => noimpl!("Stop: https://github.com/webern/midi_file/issues/10"),
             Message::Undefined2 => noimpl!(""),
-            Message::ActiveSensing => noimpl!("ActiveSensing"),
-            Message::SystemReset => noimpl!("SystemReset"),
+            Message::ActiveSensing => {
+                noimpl!("ActiveSensing: https://github.com/webern/midi_file/issues/10")
+            }
+            Message::SystemReset => {
+                noimpl!("SystemReset: https://github.com/webern/midi_file/issues/10")
+            }
         }
     }
 }
@@ -392,7 +420,7 @@ where
         CONTROL_OMNI_MODE_ON => Ok(Message::OmniModeOn(chan)),
         CONTROL_MONO_MODE_ON => Ok(Message::MonoModeOn(MonoModeOnValue {
             channel: chan,
-            mono_mode_channels: U7::new(second_byte),
+            mono_mode_channels: MonoModeChannels::new(second_byte),
         })),
         CONTROL_POLY_MODE_ON => Ok(Message::PolyModeOn(chan)),
         _ => invalid_file!("Bad channel mode value {:#04X}", first_byte),
@@ -425,6 +453,9 @@ where
     }))
 }
 
+/// Represents the control byte in a [`ControlChangeValue`]. Values greater than one byte require
+/// sending two messages, one with the most-significant byte and one with the least-significant
+/// byte. `Control` values greater than 31 are for the Lsb in these two-byte messages.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Control {
