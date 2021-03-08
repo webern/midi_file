@@ -1,10 +1,12 @@
 [package]
 name = "midi_file"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Matthew James Briggs <matthew.james.briggs@gmail.com>"]
 edition = "2018"
 exclude = [
+    ".github",
     ".gitignore",
+    ".idea",
     ".run",
     "examples/",
     "tests/",
