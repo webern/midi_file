@@ -2,8 +2,8 @@ use crate::error::LibResult;
 use crate::Error;
 use std::convert::TryFrom;
 
-/// `DurationName` is used when specifying the denominator of a [`TimeSignature`]. When defining
-/// time signatures, the MIDI file spec says:
+/// `DurationName` is used when specifying the denominator of a [`crate::file::TimeSignatureValue`].
+/// When defining time signatures, the MIDI file spec says:
 /// ```text
 /// The denominator is a negative power of two: 2 represents a quarter-note, 3 represents an'
 /// eighth-note, etc.

@@ -160,7 +160,9 @@ impl MetaEvent {
         iter.read_expect(0xff).context(io!())?;
         let meta_type_byte = iter.read_or_die().context(io!())?;
         match meta_type_byte {
-            META_SEQUENCE_NUM => noimpl!("Meta Sequence Number"),
+            META_SEQUENCE_NUM => {
+                noimpl!("Sequence Number: https://github.com/webern/midi_file/issues/8")
+            }
             META_TEXT..=META_DEVICE_NAME => MetaEvent::parse_text(iter),
             META_CHAN_PREFIX => {
                 iter.read_expect(LEN_META_CHAN_PREFIX).context(io!())?;
@@ -173,7 +175,9 @@ impl MetaEvent {
             META_SMTPE_OFFSET => Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?)),
             META_TIME_SIG => Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?)),
             META_KEY_SIG => Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?)),
-            META_SEQ_SPECIFIC => noimpl!("Meta Sequencer Specific"),
+            META_SEQ_SPECIFIC => {
+                noimpl!("Sequencer-Specific: https://github.com/webern/midi_file/issues/9")
+            }
             META_PORT => Ok(MetaEvent::Port(PortValue::new({
                 iter.read_expect(1).context(io!())?;
                 iter.read_or_die().context(io!())?
@@ -185,7 +189,9 @@ impl MetaEvent {
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
-            MetaEvent::SequenceNumber => noimpl!("Meta SequenceNumber"),
+            MetaEvent::SequenceNumber => {
+                noimpl!("Sequence Number: https://github.com/webern/midi_file/issues/8")
+            }
             MetaEvent::OtherText(s) => write_text(w, 0x01, s),
             MetaEvent::Copyright(s) => write_text(w, 0x02, s),
             MetaEvent::TrackName(s) => write_text(w, 0x03, s),
@@ -220,7 +226,9 @@ impl MetaEvent {
             MetaEvent::SmpteOffset(value) => value.write(w),
             MetaEvent::TimeSignature(value) => value.write(w),
             MetaEvent::KeySignature(value) => value.write(w),
-            MetaEvent::Sequencer => noimpl!("Meta Sequencer Specific"),
+            MetaEvent::Sequencer => {
+                noimpl!("Sequencer-Specific: https://github.com/webern/midi_file/issues/9")
+            }
             MetaEvent::Port(value) => {
                 write_u8!(w, META_PORT)?;
                 write_u8!(w, 1)?;
@@ -401,7 +409,16 @@ impl TimeSignatureValue {
 }
 
 // -7 is 7 flats, +7 is 7 sharps.
-clamp!(KeyAccidentals, i8, -7, 7, 0, pub);
+clamp!(
+    /// Represents the number of flats or sharps in a key signature. For example `-2` means
+    /// "2 flats". The valid range is from -7 to 7.
+    KeyAccidentals,
+    i8,
+    -7,
+    7,
+    0,
+    pub
+);
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub enum KeyMode {
@@ -447,21 +464,25 @@ impl KeySignatureValue {
 pub(crate) const DEFAULT_MICROSECONDS_PER_QUARTER: u32 = 500_000;
 pub(crate) const MAX_24BIT_UINT_VALUE: u32 = 16_777_215;
 
-// Tempo microseconds are given by a 6-byte integer, hence the weird upper-bound. Default tempo is
-// 120 beats per minute, which is 500_000 microseconds per beat.
-//
-// examples
-//
-// ave_maris_stella_finale_export.midi is Q=92
-// that is 1/92 => 0.010869565217391 minutes per beat
-// 0.010869565217391 * 60 => 0.652173913043478 seconds per beat
-// 0.652173913043478 * 1000000 => 652173.91304347803816 microseconds per beat
-//
-// standard tempo is Q=120
-// that is 1/120 => 0.008333333333333 minutes per beat
-// 0.008333333333333 * 60 => 0.5 seconds per beat
-// 0.652173913043478 * 1000000 => 500000 microseconds per beat
 clamp!(
+    /// In MIDI tempos are given as microseconds per quarter note. Tempo microseconds are given by a
+    /// 6-byte integer, hence the weird upper-bound (16,777,215). The default tempo is 120 beats per
+    /// minute, which is `500_000` microseconds per beat. The minimum value is `1` since `0`
+    /// microseconds per beat would be an infinitely fast tempo.
+    ///
+    /// # Examples
+    ///
+    /// ## Quarter Note at 92 Beats per Minute
+    ///
+    /// - that is 1 minute ÷ 92 => 0.010869565217391 minutes per beat (mpb)
+    /// - 0.010869565217391 mpb * 60 seconds per minute => 0.652173913043478 seconds per beat (spb)
+    /// - 0.652173913043478 spb * 1000000 => 652173.91304347803816 microseconds per beat
+    ///
+    /// ## Quarter Note at 120 Beats per Minute
+    ///
+    /// - that is 1 minute ÷ 120 beats per minute => 0.008333333333333 minutes per beat (mpb)
+    /// - 0.008333333333333 mpb * 60 seconds => 0.5 seconds per beat (spb)
+    /// - 0.652173913043478 spb * 1000000 => 500000 microseconds per beat
     MicrosecondsPerQuarter,
     u32,
     1,
@@ -481,4 +502,15 @@ impl MicrosecondsPerQuarter {
     }
 }
 
-clamp!(QuartersPerMinute, u8, 1, u8::MAX, 120, pub);
+clamp!(
+    /// A more convenient way to specify tempo, not part of the MIDI spec. This is closer to the way
+    /// we think of tempo, e.g. "120 Beats per Minute". This type is locked to quarter-notes so you
+    /// will have to translate if your "beat" is not a quarter note. Any `u8` greater than zero is
+    /// valid.
+    QuartersPerMinute,
+    u8,
+    1,
+    u8::MAX,
+    120,
+    pub
+);

@@ -12,7 +12,9 @@ use std::fmt::{Display, Formatter};
 /// then we store the original bytes to facilitate lossless parsing.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub enum Text {
+    /// A UTF-8 encoded string.
     Utf8(String),
+    /// Some bytes that we don't understand, probably a string in some non-UTF-8 encoding.
     Other(Vec<u8>),
 }
 

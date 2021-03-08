@@ -17,8 +17,11 @@ macro_rules! write_u8 {
 /// - 0 is the default value
 /// - pub is the visibility of the struct
 macro_rules! clamp {
-    ($symbol:ident, $inner_type:ty, $min:expr, $max:expr, $default:expr, $visibility:vis) => {
-        /// $inner_type value clamped to be between $min and $max.
+    (
+        $(#[$meta:meta])*
+        $symbol:ident, $inner_type:ty, $min:expr, $max:expr, $default:expr, $visibility:vis
+    ) => {
+        $(#[$meta])*
         #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
         $visibility struct $symbol($inner_type);
 
@@ -29,7 +32,7 @@ macro_rules! clamp {
         }
 
         impl $symbol {
-            /// Silently clamps the value if it is out of range.
+            /// Silently clamps the value if it is out of range. See [`Self::set`].
             #[allow(dead_code)]
             $visibility const fn new(value: $inner_type) -> Self {
                 let (clamped, _) = Self::clamp(value);
@@ -43,7 +46,9 @@ macro_rules! clamp {
             }
 
             /// Clamps and sets. Returns `true` if `value` was in range. Returns `false` if `value`
-            /// was out-of-range.
+            /// was out-of-range. That is, given a valid range of `1..=5`, then `set(0)` will set
+            /// the value to `1` and return `false`. `set(4)` will set the value to `4` and return
+            /// `true`.
             #[allow(dead_code)]
             $visibility fn set(&mut self, value: $inner_type) -> bool {
                 let (clamped, result) = Self::clamp(value);
@@ -51,6 +56,7 @@ macro_rules! clamp {
                 result
             }
 
+            /// A private const function that does the clamping.
             #[allow(unused_comparisons)]
             const fn clamp(value: $inner_type) -> ($inner_type, bool) {
                 if value < $min {

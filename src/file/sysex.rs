@@ -3,6 +3,8 @@ use crate::error::LibResult;
 use crate::scribe::Scribe;
 use std::io::{Read, Write};
 
+/// Caution: Sysex messages are [not implemented](https://github.com/webern/midi_file/issues/7) and
+/// will error.
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct SysexEvent {
     t: SysexEventType,
