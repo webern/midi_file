@@ -90,7 +90,7 @@ macro_rules! clamp {
 }
 
 #[test]
-#[allow(clippy::blacklisted_name)]
+#[allow(clippy::disallowed_names)]
 fn clamp_test() {
     clamp!(Foo, u8, 1, 16, 1, pub);
     let foo: Foo = 0u8.into();

@@ -271,7 +271,7 @@ fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> LibRes
     let size_u32 = u32::try_from(bytes.len()).context(error::StringTooLong { site: site!() })?;
     let size = Vlq::new(size_u32).to_bytes();
     w.write_all(&size).context(wr!())?;
-    w.write_all(&bytes).context(wr!())?;
+    w.write_all(bytes).context(wr!())?;
     Ok(())
 }
 
@@ -287,6 +287,9 @@ pub struct SmpteOffsetValue {
 }
 
 impl SmpteOffsetValue {
+    // TODO - create a `new` function.
+    // TODO - create getters.
+
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
         // after 0x54 we should see 0x05
         iter.read_expect(LEN_META_SMTPE_OFFSET).context(io!())?;
@@ -365,6 +368,7 @@ pub struct TimeSignatureValue {
 }
 
 impl TimeSignatureValue {
+    /// Create a new `TimeSignatureValue` object.
     pub fn new(numerator: u8, denominator: DurationName, click: Clocks) -> Result<Self> {
         ensure!(numerator > 0, error::Other { site: site!() });
         Ok(Self {
@@ -375,14 +379,17 @@ impl TimeSignatureValue {
         })
     }
 
+    /// A getter for the `numerator` field.
     pub fn numerator(&self) -> u8 {
         self.numerator
     }
 
+    /// A getter for the `denominator` field.
     pub fn denominator(&self) -> DurationName {
         self.denominator
     }
 
+    /// A getter for the `click` field.
     pub fn click(&self) -> Clocks {
         self.click
     }
@@ -439,6 +446,21 @@ pub struct KeySignatureValue {
 }
 
 impl KeySignatureValue {
+    /// Create a new `KeySignatureValue` object.
+    pub fn new(accidentals: KeyAccidentals, mode: KeyMode) -> Self {
+        Self { accidentals, mode }
+    }
+
+    /// A getter for the `accidentals` field.
+    pub fn accidentals(&self) -> KeyAccidentals {
+        self.accidentals
+    }
+
+    /// A getter for the `mode` field.
+    pub fn mode(&self) -> KeyMode {
+        self.mode
+    }
+
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
         iter.read_expect(LEN_META_KEY_SIG).context(io!())?;
         let raw_accidentals_byte = iter.read_or_die().context(io!())?;

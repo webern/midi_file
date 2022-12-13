@@ -81,10 +81,12 @@ impl TrackEvent {
         Self { delta_time, event }
     }
 
+    /// A getter for the `delta_time` field.
     pub fn delta_time(&self) -> u32 {
         self.delta_time
     }
 
+    /// A getter for the `event` field.
     pub fn event(&self) -> &Event {
         &self.event
     }

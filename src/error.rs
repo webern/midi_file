@@ -155,7 +155,7 @@ macro_rules! noimpl {
             site: site!(),
             feature: $name.to_string(),
         }
-        .fail();
+        .fail()
     };
 }
 

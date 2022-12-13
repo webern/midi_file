@@ -28,6 +28,8 @@ impl Track {
         self.events.len()
     }
 
+    // TODO - maybe implement Iterator and IntoIterator on this type instead of doing this.
+    /// Iterator over the events in the track.
     pub fn events(&self) -> impl Iterator<Item = &TrackEvent> {
         self.events.iter()
     }
