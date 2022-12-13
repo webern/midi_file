@@ -12,14 +12,17 @@ pub struct Header {
 }
 
 impl Header {
+    /// Create a new `Header` object.
     pub fn new(format: Format, division: Division) -> Self {
         Self { format, division }
     }
 
+    /// A getter for the `format` field.
     pub fn format(&self) -> &Format {
         &self.format
     }
 
+    /// A getter for the `division` field.
     pub fn division(&self) -> &Division {
         &self.division
     }

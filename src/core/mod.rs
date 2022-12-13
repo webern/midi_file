@@ -14,7 +14,9 @@ pub(crate) mod vlq;
 pub use clocks::Clocks;
 pub use duration_name::DurationName;
 pub use general_midi::GeneralMidi;
-pub use message::{Control, Message, NoteMessage, ProgramChangeValue};
+pub use message::{
+    Control, LocalControlValue, Message, MonoModeOnValue, NoteMessage, ProgramChangeValue,
+};
 pub use numbers::{
     Channel, ControlValue, MonoModeChannels, NoteNumber, PortValue, Program, Velocity,
 };

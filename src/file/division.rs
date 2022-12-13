@@ -108,3 +108,15 @@ impl Default for SmpteRate {
         }
     }
 }
+
+impl SmpteRate {
+    /// A getter for the `frame_rate` field.
+    pub fn frame_rate(&self) -> FrameRate {
+        self.frame_rate
+    }
+
+    /// A getter for the `resolution` field.
+    pub fn resolution(&self) -> u8 {
+        self.resolution
+    }
+}

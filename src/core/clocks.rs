@@ -63,7 +63,7 @@ impl Clocks {
     }
 
     // Get the `u8` value represented by the enum.
-    pub(crate) fn to_u8(&self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         match self {
             Clocks::DottedWhole => 142,
             Clocks::Whole => 96,
@@ -75,7 +75,7 @@ impl Clocks {
             Clocks::Eighth => 12,
             Clocks::DottedSixteenth => 9,
             Clocks::Sixteenth => 6,
-            Clocks::Other(v) => *v,
+            Clocks::Other(v) => v,
         }
     }
 

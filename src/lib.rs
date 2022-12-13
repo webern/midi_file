@@ -119,6 +119,16 @@ impl MidiFile {
         Self::new_with_settings(Settings::new())
     }
 
+    /// A getter for the `header` field.
+    pub fn header(&self) -> &Header {
+        &self.header
+    }
+
+    /// A getter for the `running_status` field.
+    pub fn running_status(&self) -> bool {
+        self.running_status
+    }
+
     /// Create a new `MidiFile` with customizable [`Settings`].
     pub fn new_with_settings(settings: Settings) -> Self {
         Self {
@@ -160,7 +170,7 @@ impl MidiFile {
     /// Save a `MidiFile` to a file path.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path = path.as_ref();
-        let file = File::create(&path).context(error::Create {
+        let file = File::create(path).context(error::Create {
             site: site!(),
             path,
         })?;
@@ -174,18 +184,16 @@ impl MidiFile {
         self.write(&mut scribe)
     }
 
-    pub fn header(&self) -> &Header {
-        &self.header
-    }
-
     pub fn tracks_len(&self) -> u32 {
         u32::try_from(self.tracks.len()).unwrap_or(u32::MAX)
     }
 
+    /// An iterator over the tracks in the file.
     pub fn tracks(&self) -> impl Iterator<Item = &Track> {
         self.tracks.iter()
     }
 
+    /// Get a reference to the track at `index` if it exists.
     pub fn track(&self, index: u32) -> Option<&Track> {
         let i = match usize::try_from(index) {
             Ok(ok) => ok,

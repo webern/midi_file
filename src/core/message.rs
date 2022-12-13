@@ -24,6 +24,21 @@ pub struct NoteMessage {
 }
 
 impl NoteMessage {
+    /// Getter for the `channel` field.
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+
+    /// Getter for the `note_number` field.
+    pub fn note_number(&self) -> NoteNumber {
+        self.note_number
+    }
+
+    /// Getter for the `velocity` field.
+    pub fn velocity(&self) -> Velocity {
+        self.velocity
+    }
+
     fn parse<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Self> {
         Ok(NoteMessage {
             channel,
@@ -121,10 +136,34 @@ impl Default for ModeMessage {
     }
 }
 
+impl LocalControlValue {
+    /// A getter for the `channel` field.
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+
+    /// A getter for the `on_off` field.
+    pub fn on_off(&self) -> OnOff {
+        self.on_off
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonoModeOnValue {
     channel: Channel,
     mono_mode_channels: MonoModeChannels,
+}
+
+impl MonoModeOnValue {
+    /// A getter for the `channel` field.
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+
+    /// A getter for the `mono_mode_channels` field.
+    pub fn mono_mode_channels(&self) -> MonoModeChannels {
+        self.mono_mode_channels
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -745,12 +784,17 @@ pub struct ControlChangeValue {
 }
 
 impl ControlChangeValue {
+    /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
     }
+
+    /// A getter for the `control` field.
     pub fn control(&self) -> Control {
         self.control
     }
+
+    /// A getter for the `value` field.
     pub fn value(&self) -> ControlValue {
         self.value
     }

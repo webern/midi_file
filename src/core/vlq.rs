@@ -12,7 +12,7 @@ impl Vlq {
         Self { inner: value }
     }
 
-    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+    pub(crate) fn to_bytes(self) -> Vec<u8> {
         encode_u32(self.inner)
     }
 }
