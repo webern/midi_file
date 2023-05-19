@@ -1,6 +1,7 @@
 use crate::byte_iter::ByteIter;
 use crate::core::{
-    Channel, ControlValue, MonoModeChannels, NoteNumber, Program, StatusType, Velocity,
+    Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, Program, StatusType,
+    Velocity,
 };
 use crate::error::{self, LibResult};
 use crate::scribe::Scribe;
@@ -90,10 +91,38 @@ impl WriteBytes for ProgramChangeValue {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ChannelPressureMessage {}
 
-// TODO - unused?
-/// Maybe unused.
+/// Provides the ability to pitch bend a channel by specifying a pitch bend value between
+/// 0 and 16383 where 8192 (the middle) is no pitch bend. Above 8192 bends the note up and
+/// below bends the note down. The actual pitch change depends upon the device (e.g. synth)
+/// but by default the range is +/- 2 semitones around the standard note pitch.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct PitchBendMessage {}
+pub struct PitchBendMessage {
+    pub(crate) channel: Channel,
+    pub(crate) pitch_bend: PitchBendValue,
+}
+
+impl PitchBendMessage {
+    /// Get the channel value.
+    pub fn channel(&self) -> &Channel {
+        &self.channel
+    }
+
+    /// Get the pitch bend value (0 - 16383).
+    pub fn pitch_bend(&self) -> &PitchBendValue {
+        &self.pitch_bend
+    }
+}
+
+impl WriteBytes for PitchBendMessage {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+        write_status_byte(w, StatusType::PitchBend, self.channel)?;
+        let lsb = (self.pitch_bend.get() & 0x74) as u8;
+        let msb = ((self.pitch_bend.get() >> 7) & 0x74) as u8;
+        write_u8!(w, lsb)?;
+        write_u8!(w, msb)?;
+        Ok(())
+    }
+}
 
 /// Some complicated MIDI thing.
 #[repr(u8)]
@@ -330,9 +359,7 @@ impl Message {
             Message::ChannelPressure(_) => {
                 noimpl!("ChannelPressure: https://github.com/webern/midi_file/issues/X")
             }
-            Message::PitchBend(_) => {
-                noimpl!("PitchBend: https://github.com/webern/midi_file/issues/10")
-            }
+            Message::PitchBend(value) => value.write(w),
             Message::AllSoundsOff(channel) => write_chanmod(w, *channel, CONTROL_ALL_SOUNDS_OFF, 0),
             Message::ResetAllControllers(channel) => {
                 write_chanmod(w, *channel, CONTROL_RESET_ALL_CONTROLLERS, 0)

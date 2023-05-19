@@ -1,7 +1,7 @@
 use crate::byte_iter::ByteIter;
 use crate::core::{
-    Channel, Clocks, DurationName, GeneralMidi, Message, NoteMessage, NoteNumber, Program,
-    ProgramChangeValue, Velocity,
+    Channel, Clocks, DurationName, GeneralMidi, Message, NoteMessage, NoteNumber, PitchBendMessage,
+    PitchBendValue, Program, ProgramChangeValue, Velocity,
 };
 use crate::error::LibResult;
 use crate::file::{
@@ -188,6 +188,20 @@ impl Track {
     pub fn push_lyric<S: Into<String>>(&mut self, delta_time: u32, lyric: S) -> crate::Result<()> {
         let lyric = Event::Meta(MetaEvent::Lyric(Text::new(lyric)));
         self.push_event(delta_time, lyric)
+    }
+
+    pub fn push_pitch_bend(
+        &mut self,
+        delta_time: u32,
+        channel: Channel,
+        pitch_bend: PitchBendValue,
+    ) -> crate::Result<()> {
+        let pitch_bend = Event::Midi(Message::PitchBend(PitchBendMessage {
+            channel,
+            pitch_bend,
+        }));
+        self.push_event(delta_time, pitch_bend)?;
+        Ok(())
     }
 
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
