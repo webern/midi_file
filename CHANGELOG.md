@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [v0.0.4] 2022-06-12
 ## Changed
 - Add support for pitch bend events. Thank you, @robrennie [#15]
-- 
+
+[#15]: https://github.com/webern/midi_file/issues/15
+
 ## [v0.0.3] 2022-12-13
 ## Changed
 - Add some getters to access private fields. [#14]
