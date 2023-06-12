@@ -3,7 +3,9 @@
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(missing_docs)]
+#[derive(Default)]
 pub enum GeneralMidi {
+    #[default]
     AcousticGrandPiano = 1,
     BrightAcousticPiano = 2,
     ElectricGrandPiano = 3,
@@ -132,12 +134,6 @@ pub enum GeneralMidi {
     Helicopter = 126,
     Applause = 127,
     Gunshot = 128,
-}
-
-impl Default for GeneralMidi {
-    fn default() -> Self {
-        GeneralMidi::AcousticGrandPiano
-    }
 }
 
 impl From<u8> for GeneralMidi {

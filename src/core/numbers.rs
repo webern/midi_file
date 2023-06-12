@@ -74,3 +74,14 @@ clamp!(
     0,
     pub
 );
+
+clamp!(
+    /// Represents the MIDI pitch bend value. The minimum value is `0`, the maximum value is `16383`
+    /// (i.e. `u14`). This type will clamp values to the valid range.
+    PitchBendValue,
+    u16,
+    0,
+    16383,
+    8192,
+    pub
+);

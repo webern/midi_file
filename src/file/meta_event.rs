@@ -25,7 +25,7 @@ use std::io::{Read, Write};
 /// used, it should be placed as early as possible in the file, so it will be noticed easily. Sequence Number and
 /// Sequence/Track Name events, if present, must appear at time 0. An end-of-track event must occur as the last event in
 /// the track.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum MetaEvent {
     /// `FF 00 02 ssss`: This optional event, which must occur at the beginning of a track, before any nonzero delta-
     /// times, and before any transmittable MIDI events, specifies the number of a sequence. In a format 2 MIDI file, it
@@ -90,6 +90,7 @@ pub enum MetaEvent {
 
     /// `FF 2F 00`: This event is not optional. It is included so that an exact ending point may be specified for the
     /// track, so that it has an exact length, which is necessary for tracks which are looped or concatenated.
+    #[default]
     EndOfTrack,
 
     /// `FF 51 03 tttttt`: Set Tempo, in microseconds per MIDI quarter-note. This event indicates a tempo change.
@@ -147,12 +148,6 @@ pub enum MetaEvent {
 
     /// `FF 0x21 0x01 value`: https://mido.readthedocs.io/en/latest/meta_message_types.html
     Port(PortValue),
-}
-
-impl Default for MetaEvent {
-    fn default() -> Self {
-        MetaEvent::EndOfTrack
-    }
 }
 
 impl MetaEvent {
@@ -427,16 +422,11 @@ clamp!(
     pub
 );
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum KeyMode {
+    #[default]
     Major,
     Minor,
-}
-
-impl Default for KeyMode {
-    fn default() -> Self {
-        KeyMode::Major
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]

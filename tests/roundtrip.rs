@@ -163,7 +163,7 @@ fn expected_bytes<P: AsRef<Path>>(original_file: P) -> Vec<u8> {
         .to_str()
         .unwrap();
     let expected_name = base_name.replace(&format!(".{}", ext), ".expected");
-    let expected_path = dir.join(&expected_name);
+    let expected_path = dir.join(expected_name);
     if expected_path.exists() {
         std::fs::read(&expected_path).unwrap()
     } else {

@@ -48,20 +48,15 @@ impl Header {
 }
 
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum Format {
     /// 0 the file contains a single multi-channel track
     Single = 0,
     /// 1 the file contains one or more simultaneous tracks (or MIDI outputs) of a sequence
+    #[default]
     Multi = 1,
     /// 2 the file contains one or more sequentially independent single-track patterns
     Sequential = 2,
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format::Multi
-    }
 }
 
 impl Format {

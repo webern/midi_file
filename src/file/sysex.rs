@@ -26,14 +26,9 @@ impl SysexEvent {
 }
 
 #[repr(u8)]
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum SysexEventType {
+    #[default]
     F0 = 0xf0,
     F7 = 0xf7,
-}
-
-impl Default for SysexEventType {
-    fn default() -> Self {
-        SysexEventType::F0
-    }
 }

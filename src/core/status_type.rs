@@ -4,9 +4,10 @@ use std::convert::TryFrom;
 /// Represents the status byte types in Table I "Summary of Status Bytes" from the MIDI
 /// specification.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum StatusType {
     /// `0x8`: a `Note Off` message.
+    #[default]
     NoteOff = 0x8,
 
     /// `0x9`: a `Note On (a velocity of 0 = Note Off)` message.
@@ -32,12 +33,6 @@ pub enum StatusType {
 
     /// `0xF`: a `System Message`.
     System = 0xF,
-}
-
-impl Default for StatusType {
-    fn default() -> Self {
-        StatusType::NoteOff
-    }
 }
 
 impl StatusType {

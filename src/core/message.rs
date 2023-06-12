@@ -1,6 +1,7 @@
 use crate::byte_iter::ByteIter;
 use crate::core::{
-    Channel, ControlValue, MonoModeChannels, NoteNumber, Program, StatusType, Velocity,
+    Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, Program, StatusType,
+    Velocity,
 };
 use crate::error::{self, LibResult};
 use crate::scribe::Scribe;
@@ -90,10 +91,38 @@ impl WriteBytes for ProgramChangeValue {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ChannelPressureMessage {}
 
-// TODO - unused?
-/// Maybe unused.
+/// Provides the ability to pitch bend a channel by specifying a pitch bend value between
+/// 0 and 16383 where 8192 (the middle) is no pitch bend. Above 8192 bends the note up and
+/// below bends the note down. The actual pitch change depends upon the device (e.g. synth)
+/// but by default the range is +/- 2 semitones around the standard note pitch.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct PitchBendMessage {}
+pub struct PitchBendMessage {
+    pub(crate) channel: Channel,
+    pub(crate) pitch_bend: PitchBendValue,
+}
+
+impl PitchBendMessage {
+    /// Get the channel value.
+    pub fn channel(&self) -> &Channel {
+        &self.channel
+    }
+
+    /// Get the pitch bend value (0 - 16383).
+    pub fn pitch_bend(&self) -> &PitchBendValue {
+        &self.pitch_bend
+    }
+}
+
+impl WriteBytes for PitchBendMessage {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+        write_status_byte(w, StatusType::PitchBend, self.channel)?;
+        let lsb = (self.pitch_bend.get() & 0x74) as u8;
+        let msb = ((self.pitch_bend.get() >> 7) & 0x74) as u8;
+        write_u8!(w, lsb)?;
+        write_u8!(w, msb)?;
+        Ok(())
+    }
+}
 
 /// Some complicated MIDI thing.
 #[repr(u8)]
@@ -113,15 +142,11 @@ pub enum ModeMessage {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]
+#[derive(Default)]
 pub enum OnOff {
     On = 127,
+    #[default]
     Off = 0,
-}
-
-impl Default for OnOff {
-    fn default() -> Self {
-        OnOff::Off
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -192,8 +217,9 @@ pub struct SongPositionPointerMessage {}
 pub struct SongSelectMessage {}
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub enum SystemRealtimeMessage {
+    #[default]
     TimingClock = 0xf8,
     Undefined1 = 0xf9,
     Start = 0xfa,
@@ -202,12 +228,6 @@ pub enum SystemRealtimeMessage {
     Undefined2 = 0xfd,
     ActiveSensing = 0xfe,
     SystemReset = 0xff,
-}
-
-impl Default for SystemRealtimeMessage {
-    fn default() -> Self {
-        SystemRealtimeMessage::TimingClock
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -330,9 +350,7 @@ impl Message {
             Message::ChannelPressure(_) => {
                 noimpl!("ChannelPressure: https://github.com/webern/midi_file/issues/X")
             }
-            Message::PitchBend(_) => {
-                noimpl!("PitchBend: https://github.com/webern/midi_file/issues/10")
-            }
+            Message::PitchBend(value) => value.write(w),
             Message::AllSoundsOff(channel) => write_chanmod(w, *channel, CONTROL_ALL_SOUNDS_OFF, 0),
             Message::ResetAllControllers(channel) => {
                 write_chanmod(w, *channel, CONTROL_RESET_ALL_CONTROLLERS, 0)
@@ -496,8 +514,9 @@ where
 /// sending two messages, one with the most-significant byte and one with the least-significant
 /// byte. `Control` values greater than 31 are for the Lsb in these two-byte messages.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub enum Control {
+    #[default]
     BankSelect = 0,
     ModWheel = 1,
     BreathController = 2,
@@ -622,12 +641,6 @@ pub enum Control {
     Undefined117 = 117,
     Undefined118 = 118,
     Undefined119 = 119,
-}
-
-impl Default for Control {
-    fn default() -> Self {
-        Control::BankSelect
-    }
 }
 
 impl Control {
