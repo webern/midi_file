@@ -9,7 +9,7 @@ use std::convert::TryFrom;
 /// eighth-note, etc.
 /// ```
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum DurationName {
     /// Whole Note / Semibreve
     Whole = 0,
@@ -18,6 +18,7 @@ pub enum DurationName {
     Half = 1,
 
     /// Quarter Note / Crotchet
+    #[default]
     Quarter = 2,
 
     /// Eighth Note / Quaver
@@ -43,12 +44,6 @@ pub enum DurationName {
 
     /// One Thousand Twenty-Fourth Note
     D1024 = 10,
-}
-
-impl Default for DurationName {
-    fn default() -> Self {
-        DurationName::Quarter
-    }
 }
 
 impl DurationName {

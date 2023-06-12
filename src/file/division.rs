@@ -69,8 +69,10 @@ impl TryFrom<u16> for Division {
 /// complement form.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
 #[allow(dead_code)]
+#[derive(Default)]
 pub enum FrameRate {
     /// 24 frames per second
+    #[default]
     N24,
     /// 25 frames per second
     N25,
@@ -78,12 +80,6 @@ pub enum FrameRate {
     N29,
     /// 30 frames per second
     N30,
-}
-
-impl Default for FrameRate {
-    fn default() -> Self {
-        FrameRate::N24
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]

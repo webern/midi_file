@@ -1,7 +1,7 @@
 /// There are 24 MIDI Clocks in every quarter note. (12 MIDI Clocks in an eighth note, 6 MIDI Clocks
 /// in a 16th, etc). One example of using this enum is in the `TimeSignature`, where we can specify
 /// the frequency of the metronome click.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum Clocks {
     /// 142 MIDI clocks.
     DottedWhole,
@@ -19,6 +19,7 @@ pub enum Clocks {
     DottedQuarter,
 
     /// 24 MIDI clocks.
+    #[default]
     Quarter,
 
     /// 18 MIDI clocks.
@@ -35,12 +36,6 @@ pub enum Clocks {
 
     /// Any number of MIDI clocks, intended for durations not named above.
     Other(u8),
-}
-
-impl Default for Clocks {
-    fn default() -> Self {
-        Clocks::Quarter
-    }
 }
 
 impl Clocks {

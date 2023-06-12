@@ -142,15 +142,11 @@ pub enum ModeMessage {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]
+#[derive(Default)]
 pub enum OnOff {
     On = 127,
+    #[default]
     Off = 0,
-}
-
-impl Default for OnOff {
-    fn default() -> Self {
-        OnOff::Off
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -221,8 +217,9 @@ pub struct SongPositionPointerMessage {}
 pub struct SongSelectMessage {}
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub enum SystemRealtimeMessage {
+    #[default]
     TimingClock = 0xf8,
     Undefined1 = 0xf9,
     Start = 0xfa,
@@ -231,12 +228,6 @@ pub enum SystemRealtimeMessage {
     Undefined2 = 0xfd,
     ActiveSensing = 0xfe,
     SystemReset = 0xff,
-}
-
-impl Default for SystemRealtimeMessage {
-    fn default() -> Self {
-        SystemRealtimeMessage::TimingClock
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -523,8 +514,9 @@ where
 /// sending two messages, one with the most-significant byte and one with the least-significant
 /// byte. `Control` values greater than 31 are for the Lsb in these two-byte messages.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub enum Control {
+    #[default]
     BankSelect = 0,
     ModWheel = 1,
     BreathController = 2,
@@ -649,12 +641,6 @@ pub enum Control {
     Undefined117 = 117,
     Undefined118 = 118,
     Undefined119 = 119,
-}
-
-impl Default for Control {
-    fn default() -> Self {
-        Control::BankSelect
-    }
 }
 
 impl Control {
