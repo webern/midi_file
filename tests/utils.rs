@@ -13,6 +13,8 @@ pub const B_GUAJEO: &str = "b_guajeo.mid";
 pub const LATER_FOLIA: &str = "later_folia.mid";
 pub const LOGIC_PRO: &str = "logic_pro.mid";
 pub const PHOBOS_DORICO: &str = "phobos_dorico.mid";
+pub const PITCH_BEND: &str = "pitch_bend.mid";
+pub const PITCH_BEND_TWO_BYTES: &str = "pitch_bend_two_bytes.mid";
 pub const TOBEFREE: &str = "tobefree.mid";
 
 static LOGGER: Once = Once::new();

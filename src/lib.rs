@@ -3,7 +3,6 @@
 #![deny(clippy::complexity)]
 #![deny(clippy::perf)]
 #![deny(clippy::style)]
-#![deny(dead_code)]
 // TODO - maybe document all pub(crate) types
 // #![deny(missing_crate_level_docs)]
 // TODO - document all
