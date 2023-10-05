@@ -1,0 +1,5 @@
+Something I exported from Logic so that I know the exact pitch bend values. It has the following
+pitch bend values shown by logic on each beat 0, 20, 40, 127 , 125, 101, 40, 20. Note that the
+actual numbers are multiplied by 128 because Logic pretends pitch bend is 7-bits when it is actually
+14-bits.
+Creative commons, Public domain, etc.

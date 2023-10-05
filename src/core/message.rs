@@ -1,12 +1,12 @@
 use crate::byte_iter::ByteIter;
+use crate::core::bits::{decode_14_bit_number, encode_14_bit_number};
 use crate::core::{
     Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, Program, StatusType,
     Velocity,
 };
 use crate::error::{self, LibResult};
 use crate::scribe::Scribe;
-use log::trace;
-use log::warn;
+use log::{trace, warn};
 use snafu::{OptionExt, ResultExt};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
@@ -116,10 +116,10 @@ impl PitchBendMessage {
 impl WriteBytes for PitchBendMessage {
     fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         write_status_byte(w, StatusType::PitchBend, self.channel)?;
-        let lsb = (self.pitch_bend.get() & 0x74) as u8;
-        let msb = ((self.pitch_bend.get() >> 7) & 0x74) as u8;
-        write_u8!(w, lsb)?;
-        write_u8!(w, msb)?;
+        let decoded = self.pitch_bend.get();
+        let encoded = encode_14_bit_number(decoded);
+        write_u8!(w, ((encoded >> 8) as u8))?;
+        write_u8!(w, ((encoded & 0b0000000011111111) as u8))?;
         Ok(())
     }
 }
@@ -334,7 +334,12 @@ impl Message {
                 noimpl!("channel pressure: https://github.com/webern/midi_file/issues/X")
             }
             StatusType::PitchBend => {
-                noimpl!("pitch bend: https://github.com/webern/midi_file/issues/10")
+                let value = iter.read_u16().unwrap();
+                let decoded = decode_14_bit_number(value);
+                Ok(Message::PitchBend(PitchBendMessage {
+                    channel,
+                    pitch_bend: PitchBendValue::new(decoded),
+                }))
             }
             StatusType::System => noimpl!("system: https://github.com/webern/midi_file/issues/10"),
         }

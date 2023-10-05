@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use utils::{
     enable_logging, test_file, ADESTE_FIDELES, ALS_DIE_ROEMER, AVE_MARIS_STELLA, BARITONE_SAX,
-    B_GUAJEO, LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO, TOBEFREE,
+    B_GUAJEO, LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO, PITCH_BEND, PITCH_BEND_TWO_BYTES, TOBEFREE,
 };
 
 type RtResult = std::result::Result<(), RtErr>;
@@ -239,6 +239,16 @@ fn logic_pro() {
 #[test]
 fn phobos_dorico() {
     round_trip_test(PHOBOS_DORICO).unwrap();
+}
+
+#[test]
+fn pitch_bend() {
+    round_trip_test(PITCH_BEND).unwrap();
+}
+
+#[test]
+fn pitch_bend_two_bytes() {
+    round_trip_test(PITCH_BEND_TWO_BYTES).unwrap();
 }
 
 #[test]

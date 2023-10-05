@@ -1,10 +1,12 @@
 mod utils;
 
+use crate::utils::{PITCH_BEND, PITCH_BEND_TWO_BYTES};
 use midi_file::core::{Clocks, Control, DurationName, Message};
 use midi_file::file::{Division, Event, Format, MetaEvent, QuarterNoteDivision};
 use midi_file::MidiFile;
 use std::fs::File;
 use std::io::Read;
+use tempfile::tempdir;
 use utils::{enable_logging, test_file, AVE_MARIS_STELLA};
 
 #[test]
@@ -175,4 +177,89 @@ fn ave_maris_stella_finale_export() {
         let written = written_bytes.get(index).unwrap();
         assert_eq!(original, written);
     }
+}
+
+#[test]
+fn pitch_bend() {
+    enable_logging();
+    let midi_file = MidiFile::load(test_file(PITCH_BEND)).unwrap();
+    let track = midi_file.tracks().next().unwrap();
+
+    fn assert_pitch_bend(event: &Event, expected: u16) {
+        let message = match event {
+            Event::Midi(message) => message,
+            _ => panic!("wrong event type {:?}", event),
+        };
+        let pitch_bend_message = match message {
+            Message::PitchBend(p) => p,
+            _ => panic!("wrong message type {:?}", message),
+        };
+        assert_eq!(pitch_bend_message.pitch_bend().get(), expected);
+    }
+
+    // The file was created with Logic Pro, which treats Pitch Bend values as a single 7-bit number,
+    // from 0-127 instead of using the full range. If we multiply by 128 then we get the actual,
+    // written 14-bit value instead of the value displayed in Logic's UI.
+    assert_pitch_bend(track.events().nth(8).unwrap().event(), 0);
+    assert_pitch_bend(track.events().nth(9).unwrap().event(), 20 * 128);
+    assert_pitch_bend(track.events().nth(10).unwrap().event(), 40 * 128);
+    assert_pitch_bend(track.events().nth(11).unwrap().event(), 127 * 128);
+    assert_pitch_bend(track.events().nth(12).unwrap().event(), 125 * 128);
+    assert_pitch_bend(track.events().nth(13).unwrap().event(), 101 * 128);
+    assert_pitch_bend(track.events().nth(14).unwrap().event(), 40 * 128);
+    assert_pitch_bend(track.events().nth(15).unwrap().event(), 20 * 128);
+
+    let tempdir = tempdir().unwrap();
+    let path = tempdir.path().join("file.mid");
+    midi_file.save(&path).unwrap();
+    let midi_file = MidiFile::load(&path).unwrap();
+    let track = midi_file.tracks().next().unwrap();
+    assert_pitch_bend(track.events().nth(8).unwrap().event(), 0);
+    assert_pitch_bend(track.events().nth(9).unwrap().event(), 20 * 128);
+    assert_pitch_bend(track.events().nth(10).unwrap().event(), 40 * 128);
+    assert_pitch_bend(track.events().nth(11).unwrap().event(), 127 * 128);
+    assert_pitch_bend(track.events().nth(12).unwrap().event(), 125 * 128);
+    assert_pitch_bend(track.events().nth(13).unwrap().event(), 101 * 128);
+    assert_pitch_bend(track.events().nth(14).unwrap().event(), 40 * 128);
+    assert_pitch_bend(track.events().nth(15).unwrap().event(), 20 * 128);
+}
+
+#[test]
+fn pitch_bend_two_byte() {
+    enable_logging();
+    let midi_file = MidiFile::load(test_file(PITCH_BEND_TWO_BYTES)).unwrap();
+    let track = midi_file.tracks().nth(1).unwrap();
+
+    fn assert_pitch_bend(event: &Event, expected: u16) {
+        let message = match event {
+            Event::Midi(message) => message,
+            _ => panic!("wrong event type {:?}", event),
+        };
+        let pitch_bend_message = match message {
+            Message::PitchBend(p) => p,
+            _ => panic!("wrong message type {:?}", message),
+        };
+        assert_eq!(pitch_bend_message.pitch_bend().get(), expected);
+    }
+
+    assert_pitch_bend(track.events().nth(1).unwrap().event(), 8192);
+    assert_pitch_bend(track.events().nth(3).unwrap().event(), 8292);
+    assert_pitch_bend(track.events().nth(4).unwrap().event(), 8092);
+    assert_pitch_bend(track.events().nth(5).unwrap().event(), 16383);
+    assert_pitch_bend(track.events().nth(6).unwrap().event(), 0);
+    assert_pitch_bend(track.events().nth(7).unwrap().event(), 0);
+    assert_pitch_bend(track.events().nth(8).unwrap().event(), 1);
+
+    let tempdir = tempdir().unwrap();
+    let path = tempdir.path().join("file.mid");
+    midi_file.save(&path).unwrap();
+    let midi_file = MidiFile::load(&path).unwrap();
+    let track = midi_file.tracks().nth(1).unwrap();
+    assert_pitch_bend(track.events().nth(1).unwrap().event(), 8192);
+    assert_pitch_bend(track.events().nth(3).unwrap().event(), 8292);
+    assert_pitch_bend(track.events().nth(4).unwrap().event(), 8092);
+    assert_pitch_bend(track.events().nth(5).unwrap().event(), 16383);
+    assert_pitch_bend(track.events().nth(6).unwrap().event(), 0);
+    assert_pitch_bend(track.events().nth(7).unwrap().event(), 0);
+    assert_pitch_bend(track.events().nth(8).unwrap().event(), 1);
 }
