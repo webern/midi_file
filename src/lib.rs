@@ -151,8 +151,8 @@ impl MidiFile {
 
     /// Write a `MidiFile` to bytes.
     pub fn write<W: Write>(&self, w: &mut W) -> Result<()> {
-        let ntracks =
-            u16::try_from(self.tracks.len()).context(error::TooManyTracks { site: site!() })?;
+        let ntracks = u16::try_from(self.tracks.len())
+            .context(error::TooManyTracksSnafu { site: site!() })?;
         let mut scribe = Scribe::new(
             w,
             ScribeSettings {
@@ -169,7 +169,7 @@ impl MidiFile {
     /// Save a `MidiFile` to a file path.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path = path.as_ref();
-        let file = File::create(path).context(error::Create {
+        let file = File::create(path).context(error::CreateSnafu {
             site: site!(),
             path,
         })?;
@@ -202,30 +202,42 @@ impl MidiFile {
     }
 
     pub fn push_track(&mut self, track: Track) -> Result<()> {
-        ensure!(self.tracks_len() < u32::MAX, error::Other { site: site!() });
+        ensure!(
+            self.tracks_len() < u32::MAX,
+            error::OtherSnafu { site: site!() }
+        );
         if *self.header().format() == Format::Single {
-            ensure!(self.tracks_len() <= 1, error::Other { site: site!() });
+            ensure!(self.tracks_len() <= 1, error::OtherSnafu { site: site!() });
         }
         self.tracks.push(ensure_end_of_track(track)?);
         Ok(())
     }
 
     pub fn insert_track(&mut self, index: u32, track: Track) -> Result<()> {
-        ensure!(self.tracks_len() < u32::MAX, error::Other { site: site!() });
+        ensure!(
+            self.tracks_len() < u32::MAX,
+            error::OtherSnafu { site: site!() }
+        );
         if *self.header().format() == Format::Single {
-            ensure!(self.tracks_len() <= 1, error::Other { site: site!() });
+            ensure!(self.tracks_len() <= 1, error::OtherSnafu { site: site!() });
         }
-        ensure!(index < self.tracks_len(), error::Other { site: site!() });
+        ensure!(
+            index < self.tracks_len(),
+            error::OtherSnafu { site: site!() }
+        );
         self.tracks.insert(
-            usize::try_from(index).context(error::TooManyTracks { site: site!() })?,
+            usize::try_from(index).context(error::TooManyTracksSnafu { site: site!() })?,
             ensure_end_of_track(track)?,
         );
         Ok(())
     }
 
     pub fn remove_track(&mut self, index: u32) -> Result<Track> {
-        ensure!(index < self.tracks_len(), error::Other { site: site!() });
-        let i = usize::try_from(index).context(error::TooManyTracks { site: site!() })?;
+        ensure!(
+            index < self.tracks_len(),
+            error::OtherSnafu { site: site!() }
+        );
+        let i = usize::try_from(index).context(error::TooManyTracksSnafu { site: site!() })?;
         Ok(self.tracks.remove(i))
     }
 
@@ -235,7 +247,7 @@ impl MidiFile {
         let chunk_length = iter.read_u32().context(io!())?;
         // header chunk length is always 6
         if chunk_length != 6 {
-            return error::Other { site: site!() }.fail();
+            return error::OtherSnafu { site: site!() }.fail();
         }
         let format_word = iter.read_u16().context(io!())?;
         let num_tracks = iter.read_u16().context(io!())?;

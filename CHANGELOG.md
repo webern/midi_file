@@ -4,9 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v0.0.4] 2022-06-12
+## [v0.0.5] 2023-10-05
+## Added
+- Add support for reading pitch bend events. [#20]
+
 ## Changed
-- Add support for pitch bend events. Thank you, @robrennie [#15]
+- Refactored and maybe fixed the writing of pitch bend events. [#20]
+
+[#14]: https://github.com/webern/midi_file/issues/14
+
+## [v0.0.4] 2023-06-12
+## Changed
+- Add support for writing pitch bend events. Thank you, @robrennie [#15]
 
 [#15]: https://github.com/webern/midi_file/issues/15
 
@@ -36,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Everything: you can create simple MIDI files with this library.
 
 <!-- version diff links -->
-[Unreleased]: https://github.com/webern/midi_file/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/webern/midi_file/compare/v0.0.5...HEAD
+[v0.0.5]: https://github.com/webern/midi_file/compare/v0.0.4...v0.0.5
 [v0.0.4]: https://github.com/webern/midi_file/compare/v0.0.3...v0.0.4
 [v0.0.3]: https://github.com/webern/midi_file/compare/v0.0.2...v0.0.3
 [v0.0.2]: https://github.com/webern/midi_file/compare/v0.0.1...v0.0.2

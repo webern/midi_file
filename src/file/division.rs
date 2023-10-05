@@ -41,7 +41,7 @@ impl Division {
     pub(crate) fn from_u16(value: u16) -> LibResult<Self> {
         if value & DIVISION_TYPE_BIT == DIVISION_TYPE_BIT {
             // TODO - implement SMPTE division
-            crate::error::Other { site: site!() }.fail()
+            crate::error::OtherSnafu { site: site!() }.fail()
         } else {
             Ok(Division::QuarterNote(QuarterNoteDivision::new(value)))
         }
@@ -50,7 +50,7 @@ impl Division {
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
         match self {
             Division::QuarterNote(q) => Ok(w.write_all(&q.get().to_be_bytes()).context(wr!())?),
-            Division::Smpte(_) => crate::error::Other { site: site!() }.fail(),
+            Division::Smpte(_) => crate::error::OtherSnafu { site: site!() }.fail(),
         }
     }
 }

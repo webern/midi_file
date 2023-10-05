@@ -65,7 +65,7 @@ impl Format {
             0 => Ok(Format::Single),
             1 => Ok(Format::Multi),
             2 => Ok(Format::Sequential),
-            _ => crate::error::Other { site: site!() }.fail(),
+            _ => crate::error::OtherSnafu { site: site!() }.fail(),
         }
     }
 }

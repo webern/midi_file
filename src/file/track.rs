@@ -247,7 +247,7 @@ impl Track {
 
         // write the length of the track
         let track_length = u32::try_from(track_data.len())
-            .context(crate::error::TrackTooLong { site: site!() })?;
+            .context(crate::error::TrackTooLongSnafu { site: site!() })?;
         w.write_all(&track_length.to_be_bytes()).context(wr!())?;
 
         // write the track data

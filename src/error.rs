@@ -16,7 +16,7 @@ pub(crate) type LibResult<T> = std::result::Result<T, LibError>;
 
 /// The internal Error type for this library.
 #[derive(Debug, Snafu)]
-#[snafu(visibility = "pub(crate)")]
+#[snafu(visibility(pub(crate)))]
 pub(crate) enum LibError {
     #[snafu(display("{} Error creating file '{}': {}", site, path.display(), source))]
     Create {
@@ -82,31 +82,31 @@ macro_rules! site {
 
 macro_rules! io {
     () => {
-        crate::error::Read { site: site!() }
+        crate::error::ReadSnafu { site: site!() }
     };
 }
 
 macro_rules! wr {
     () => {
-        crate::error::Write { site: site!() }
+        crate::error::WriteSnafu { site: site!() }
     };
 }
 
 macro_rules! invalid_file_s {
     () => {
-        crate::error::InvalidFile {
+        crate::error::InvalidFileSnafu {
             site: site!(),
             description: "[no description]",
         }
     };
     ($msg:expr) => {
-        crate::error::InvalidFile {
+        crate::error::InvalidFileSnafu {
             site: site!(),
             description: $msg,
         }
     };
     ($fmt:expr, $($arg:expr),+) => {
-        crate::error::InvalidFile {
+        crate::error::InvalidFileSnafu {
             site: site!(),
             description: format!($fmt, $($arg),+),
         }
@@ -151,7 +151,7 @@ macro_rules! invalid_file {
 
 macro_rules! noimpl {
     ($name:expr) => {
-        return crate::error::Unimplemented {
+        return crate::error::UnimplementedSnafu {
             site: site!(),
             feature: $name.to_string(),
         }

@@ -88,7 +88,7 @@ const MB: usize = KB * 1024;
 impl ByteIter<BufReader<File>> {
     pub(crate) fn new_file<P: AsRef<Path>>(path: P) -> ByteResult<Self> {
         let path = path.as_ref();
-        let f = File::open(path).context(FileOpen { path })?;
+        let f = File::open(path).context(FileOpenSnafu { path })?;
         let buf = BufReader::with_capacity(MB, f);
         Self::new(buf.bytes())
     }
@@ -118,7 +118,7 @@ impl<R: Read> ByteIter<R> {
             Some(result) => match result {
                 Ok(val) => Ok(Some(val)),
                 Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => Ok(None),
-                Err(e) => Err(e).context(Io { position }),
+                Err(e) => Err(e).context(IoSnafu { position }),
             },
         }
     }
@@ -178,23 +178,23 @@ impl<R: Read> ByteIter<R> {
                 e
             }
         };
-        Err(e).context(Io {
+        Err(e).context(IoSnafu {
             position: self.position.unwrap_or(0),
         })
     }
 
     pub(crate) fn read_or_die(&mut self) -> ByteResult<u8> {
-        self.read()?.context(End {
+        self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })
     }
 
     pub(crate) fn read2(&mut self) -> ByteResult<[u8; 2]> {
         let mut retval = [0u8; 2];
-        retval[0] = self.read()?.context(End {
+        retval[0] = self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })?;
-        retval[1] = self.read()?.context(End {
+        retval[1] = self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })?;
         Ok(retval)
@@ -202,16 +202,16 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn read4(&mut self) -> ByteResult<[u8; 4]> {
         let mut retval = [0u8; 4];
-        retval[0] = self.read()?.context(End {
+        retval[0] = self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })?;
-        retval[1] = self.read()?.context(End {
+        retval[1] = self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })?;
-        retval[2] = self.read()?.context(End {
+        retval[2] = self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })?;
-        retval[3] = self.read()?.context(End {
+        retval[3] = self.read()?.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })?;
         Ok(retval)
@@ -235,7 +235,7 @@ impl<R: Read> ByteIter<R> {
         while current_byte & CONTINUE == CONTINUE {
             ensure!(
                 byte_count <= 4,
-                VlqTooBig {
+                VlqTooBigSnafu {
                     position: self.position.unwrap_or(0)
                 }
             );
@@ -248,7 +248,7 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn read_vlq_u32(&mut self) -> ByteResult<u32> {
         let bytes = self.read_vlq_bytes()?;
-        let decoded = decode_slice(&bytes).context(VlqDecode {
+        let decoded = decode_slice(&bytes).context(VlqDecodeSnafu {
             position: self.position.unwrap_or(0),
         })?;
         trace!("decoded vlq value {} from {} bytes", decoded, bytes.len());
@@ -260,7 +260,7 @@ impl<R: Read> ByteIter<R> {
     }
 
     pub(crate) fn peek_or_die(&self) -> ByteResult<u8> {
-        self.peek1.context(End {
+        self.peek1.context(EndSnafu {
             position: self.position.unwrap_or(0),
         })
     }
@@ -278,12 +278,12 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn expect_tag(&mut self, expected_tag: &str) -> ByteResult<()> {
         let tag_bytes = self.read4()?;
-        let actual_tag = from_utf8(&tag_bytes).context(Str {
+        let actual_tag = from_utf8(&tag_bytes).context(StrSnafu {
             position: self.position.unwrap_or(0),
         })?;
         ensure!(
             expected_tag == actual_tag,
-            Tag {
+            TagSnafu {
                 expected: expected_tag,
                 found: actual_tag,
                 position: self.position.unwrap_or(0)
@@ -306,7 +306,7 @@ impl<R: Read> ByteIter<R> {
         let found = self.read_or_die()?;
         ensure!(
             expected == found,
-            ReadExpect {
+            ReadExpectSnafu {
                 expected,
                 found,
                 position: self.position.unwrap_or(0)
