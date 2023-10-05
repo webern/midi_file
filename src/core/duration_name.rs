@@ -60,7 +60,7 @@ impl DurationName {
             v if DurationName::D256 as u8 == v => Ok(DurationName::D256),
             v if DurationName::D512 as u8 == v => Ok(DurationName::D512),
             v if DurationName::D1024 as u8 == v => Ok(DurationName::D1024),
-            _ => crate::error::Other { site: site!() }.fail(),
+            _ => crate::error::OtherSnafu { site: site!() }.fail(),
         }
     }
 }

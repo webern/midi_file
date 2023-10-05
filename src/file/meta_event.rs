@@ -240,7 +240,9 @@ impl MetaEvent {
 
     pub(crate) fn parse_text<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
         // we should be on a type-byte with a value between 0x01 and 0x09 (the text range).
-        let text_type = iter.current().context(error::Other { site: site!() })?;
+        let text_type = iter
+            .current()
+            .context(error::OtherSnafu { site: site!() })?;
         let length = iter.read_vlq_u32().context(io!())?;
         let bytes = iter.read_n(length as usize).context(io!())?;
         // the spec does not strictly specify what encoding should be used for strings
@@ -263,7 +265,8 @@ impl MetaEvent {
 fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> LibResult<()> {
     w.write_all(&text_type.to_be_bytes()).context(wr!())?;
     let bytes = text.as_bytes();
-    let size_u32 = u32::try_from(bytes.len()).context(error::StringTooLong { site: site!() })?;
+    let size_u32 =
+        u32::try_from(bytes.len()).context(error::StringTooLongSnafu { site: site!() })?;
     let size = Vlq::new(size_u32).to_bytes();
     w.write_all(&size).context(wr!())?;
     w.write_all(bytes).context(wr!())?;
@@ -365,7 +368,7 @@ pub struct TimeSignatureValue {
 impl TimeSignatureValue {
     /// Create a new `TimeSignatureValue` object.
     pub fn new(numerator: u8, denominator: DurationName, click: Clocks) -> Result<Self> {
-        ensure!(numerator > 0, error::Other { site: site!() });
+        ensure!(numerator > 0, error::OtherSnafu { site: site!() });
         Ok(Self {
             numerator,
             denominator,

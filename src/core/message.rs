@@ -290,7 +290,7 @@ impl Message {
             iter.set_running_status_detected();
             let running_status = iter
                 .latest_message_byte()
-                .context(error::RunningStatus { site: site!() })?;
+                .context(error::RunningStatusSnafu { site: site!() })?;
             trace!("running status byte {:#x}", running_status);
             running_status
         } else {
@@ -781,7 +781,7 @@ impl Control {
             x if x == Control::Undefined117 as u8 => Ok(Control::Undefined117),
             x if x == Control::Undefined118 as u8 => Ok(Control::Undefined118),
             x if x == Control::Undefined119 as u8 => Ok(Control::Undefined119),
-            _ => error::Other { site: site!() }.fail(),
+            _ => error::OtherSnafu { site: site!() }.fail(),
         }
     }
 }
