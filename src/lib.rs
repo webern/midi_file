@@ -1,3 +1,9 @@
+/*!
+
+A library for reading, writing and creating MIDI files.
+
+!*/
+
 // one per line to simplify commenting certain ones out during development
 #![deny(arithmetic_overflow)]
 #![deny(clippy::complexity)]
@@ -6,7 +12,7 @@
 // TODO - maybe document all pub(crate) types
 // #![deny(missing_crate_level_docs)]
 // TODO - document all
-// #![deny(missing_docs)]
+#![warn(missing_docs)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
 #![deny(unreachable_patterns)]
@@ -183,6 +189,7 @@ impl MidiFile {
         self.write(&mut scribe)
     }
 
+    /// The number of tracks, i.e. the length of the vector of tracks.
     pub fn tracks_len(&self) -> u32 {
         u32::try_from(self.tracks.len()).unwrap_or(u32::MAX)
     }
@@ -201,6 +208,7 @@ impl MidiFile {
         self.tracks.get(i)
     }
 
+    /// Add a track to the file.
     pub fn push_track(&mut self, track: Track) -> Result<()> {
         ensure!(
             self.tracks_len() < u32::MAX,
@@ -213,6 +221,7 @@ impl MidiFile {
         Ok(())
     }
 
+    /// Insert a track at a certain place in the vector of tracks.
     pub fn insert_track(&mut self, index: u32, track: Track) -> Result<()> {
         ensure!(
             self.tracks_len() < u32::MAX,
@@ -232,6 +241,7 @@ impl MidiFile {
         Ok(())
     }
 
+    /// Remove a track from the file. Same behavior as `vec.remove(index)`.
     pub fn remove_track(&mut self, index: u32) -> Result<Track> {
         ensure!(
             index < self.tracks_len(),

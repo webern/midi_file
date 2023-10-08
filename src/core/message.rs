@@ -149,6 +149,16 @@ pub enum OnOff {
     Off = 0,
 }
 
+/// A parameter found on most MIDI keyboards that have built-in sounds. Local Control can be set on
+/// or off, and is normally found in the global parameters for a particular instrument. When enabled
+/// the keyboard is electronically connected to the internal sounds of the instrument. This is the
+/// “normal” or default mode for most instruments. When turned off the keyboard only transmits MIDI
+/// to the MIDI out jack. The built-in sounds can then only be accessed from a MIDI input (or an
+/// internal sequencer where applicable). When people use keyboards with external sequencing
+/// equipment local control is normally turned off, and the sounds are just driven through the
+/// sequencer. This prevents a phenomenon known as MIDI echo, where a sound is triggered directly by
+/// the keyboard, and then a very short time later the same note is played again due to the data
+/// being passed through the sequencer.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct LocalControlValue {
     channel: Channel,
@@ -173,6 +183,8 @@ impl LocalControlValue {
     }
 }
 
+/// When Mono mode is selected, a single voice is assigned per MIDI Channel. This means that only
+/// one note can be played on a given Channel at a given time.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MonoModeOnValue {
     channel: Channel,
@@ -230,6 +242,12 @@ pub enum SystemRealtimeMessage {
     SystemReset = 0xff,
 }
 
+/// MIDI System Messages are classified as being System Common Messages, System Real Time Messages,
+/// or System Exclusive Messages. System Common messages are intended for all receivers in the
+/// system. System Real Time messages are used for synchronization between clock-based MIDI
+/// components. System Exclusive messages include a Manufacturer's Identification (ID) code, and are
+/// used to transfer any number of data bytes in a format specified by the referenced manufacturer.
+// TODO - add system exclusive messages (sysex)
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]
 pub enum SystemMessage {
@@ -243,7 +261,14 @@ impl Default for SystemMessage {
     }
 }
 
+/// A MIDI message is made up of an eight-bit status byte which is generally followed by one or two
+/// data bytes. There are a number of different types of MIDI messages. At the highest level, MIDI
+/// messages are classified as being either Channel Messages or System Messages. Channel messages
+/// are those which apply to a specific Channel, and the Channel number is included in the status
+/// byte for these messages. System messages are not Channel specific, and no Channel number is
+/// indicated in their status bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[allow(missing_docs)]
 pub enum Message {
     NoteOff(NoteMessage),
     NoteOn(NoteMessage),
@@ -520,6 +545,7 @@ where
 /// byte. `Control` values greater than 31 are for the Lsb in these two-byte messages.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+#[allow(missing_docs)]
 pub enum Control {
     #[default]
     BankSelect = 0,
