@@ -77,6 +77,7 @@ pub struct TrackEvent {
 }
 
 impl TrackEvent {
+    /// Create a new track event.
     pub fn new(delta_time: u32, event: Event) -> Self {
         Self { delta_time, event }
     }

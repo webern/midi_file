@@ -14,16 +14,28 @@ use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
+/// 2.3 - Track Chunks
+/// The track chunks (type MTrk) are where actual song data is stored. Each track chunk is simply a
+/// stream of MIDI events (and non-MIDI events), preceded by delta-time values. The format for Track
+/// Chunks (described below) is exactly the same for all three formats (0, 1, and 2: see "Header
+/// Chunk" above) of MIDI Files.
+///
+/// Here is the syntax of an MTrk chunk (the + means "one or more": at least one MTrk event must be
+/// present):
+///
+/// `<Track Chunk> = <chunk type><length><MTrk event>+`
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct Track {
     events: Vec<TrackEvent>,
 }
 
 impl Track {
+    /// Returns `true` if the track has no events.
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
 
+    /// The number of events in the track.
     pub fn events_len(&self) -> usize {
         self.events.len()
     }
@@ -34,12 +46,14 @@ impl Track {
         self.events.iter()
     }
 
+    /// Add an event to the end.
     pub fn push_event(&mut self, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32
         self.events.push(TrackEvent::new(delta_time, event));
         Ok(())
     }
 
+    /// Add event at `index` and shift everything after it.
     pub fn insert_event(&mut self, index: u32, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
         self.events
@@ -47,6 +61,7 @@ impl Track {
         Ok(())
     }
 
+    /// Replace the event at `index`.
     pub fn replace_event(
         &mut self,
         index: u32,
@@ -59,6 +74,7 @@ impl Track {
         Ok(())
     }
 
+    /// Add, or replace, the track name at the beginning of a track.
     pub fn set_name<S: Into<String>>(&mut self, name: S) -> crate::Result<()> {
         let name = Text::new(name);
         let meta = Event::Meta(MetaEvent::TrackName(name.clone()));
@@ -80,6 +96,7 @@ impl Track {
         Ok(())
     }
 
+    /// Add, or replace, the instrument name at the beginning of a track.
     pub fn set_instrument_name<S: Into<String>>(&mut self, name: S) -> crate::Result<()> {
         let name = Text::new(name);
         let meta = Event::Meta(MetaEvent::InstrumentName(name.clone()));
@@ -101,6 +118,7 @@ impl Track {
         Ok(())
     }
 
+    /// Add, or replace, the general midi program at the beginning of a track.
     pub fn set_general_midi(&mut self, channel: Channel, value: GeneralMidi) -> crate::Result<()> {
         let program_change = Event::Midi(Message::ProgramChange(ProgramChangeValue {
             channel,
@@ -128,6 +146,7 @@ impl Track {
         Ok(())
     }
 
+    /// Add a time signature.
     pub fn push_time_signature(
         &mut self,
         delta_time: u32,
@@ -140,6 +159,7 @@ impl Track {
         self.push_event(delta_time, event)
     }
 
+    /// Add a tempo message.
     pub fn push_tempo(
         &mut self,
         delta_time: u32,
@@ -154,6 +174,7 @@ impl Track {
         self.push_event(delta_time, event)
     }
 
+    /// Add a note on message.
     pub fn push_note_on(
         &mut self,
         delta_time: u32,
@@ -170,6 +191,7 @@ impl Track {
         Ok(())
     }
 
+    /// Add a note off message.
     pub fn push_note_off(
         &mut self,
         delta_time: u32,
@@ -185,11 +207,13 @@ impl Track {
         self.push_event(delta_time, note_off)
     }
 
+    /// Add a lyric.
     pub fn push_lyric<S: Into<String>>(&mut self, delta_time: u32, lyric: S) -> crate::Result<()> {
         let lyric = Event::Meta(MetaEvent::Lyric(Text::new(lyric)));
         self.push_event(delta_time, lyric)
     }
 
+    /// Add a pitch bend value.
     pub fn push_pitch_bend(
         &mut self,
         delta_time: u32,

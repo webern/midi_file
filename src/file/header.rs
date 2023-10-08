@@ -5,6 +5,17 @@ use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::Write;
 
+/// 2.1 - Header Chunks
+/// The header chunk at the beginning of the file specifies some basic information about the data in
+/// the file. Here's the syntax of the complete chunk:
+/// `<Header Chunk> = <chunk type><length><format><ntrks><division>`
+///
+/// As described above, <chunk type> is the four ASCII characters 'MThd'; <length> is a 32-bit
+/// representation of the number 6 (high byte first).
+///
+/// The data section contains three 16-bit words, stored most-significant byte first.
+///
+/// The first word, <format>, specifies the overall organisation of the file.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct Header {
     format: Format,
@@ -47,6 +58,12 @@ impl Header {
     }
 }
 
+/// The first word, <format>, specifies the overall organisation of the file. Only three values of
+/// `<format>` are specified:
+///
+/// 0-the file contains a single multichannel track
+/// 1-the file contains one or more simultaneous tracks (or MIDI outputs) of a sequence
+/// 2-the file contains one or more sequentially independent single-track patterns
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum Format {
