@@ -9,7 +9,7 @@ A library for reading, writing and creating MIDI files.
 #![deny(clippy::complexity)]
 #![deny(clippy::perf)]
 #![deny(clippy::style)]
-#![warn(missing_crate_level_docs)]
+#![warn(rustdoc::missing_crate_level_docs)]
 #![warn(missing_docs)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
