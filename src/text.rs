@@ -68,10 +68,12 @@ impl From<Text> for String {
 }
 
 impl Text {
+    /// Create a new `Text` object.
     pub fn new<S: Into<String>>(s: S) -> Self {
         Text::Utf8(s.into())
     }
 
+    /// Get the exact bytes of the text.
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             Text::Utf8(s) => s.as_bytes(),
@@ -79,6 +81,7 @@ impl Text {
         }
     }
 
+    /// Get a UTF-8 representation of the string (lossy if non UTF-8-encoded).
     pub fn as_str(&self) -> Cow<'_, str> {
         match self {
             Text::Utf8(s) => Cow::Borrowed(s.as_str()),

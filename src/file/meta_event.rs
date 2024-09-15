@@ -340,6 +340,22 @@ pub(crate) const LEN_META_SMTPE_OFFSET: u8 = 5;
 pub(crate) const LEN_META_TIME_SIG: u8 = 4;
 pub(crate) const LEN_META_KEY_SIG: u8 = 2;
 
+/// FF 58 04 nn dd cc bb Time Signature
+/// The time signature is expressed as four numbers. nn and dd represent the numerator and
+/// denominator of the time signature as it would be notated. The denominator is a negative power
+/// of two: 2 represents a quarter-note, 3 represents an eighth-note, etc. The cc parameter
+/// expresses the number of MIDI clocks in a metronome click. The bb parameter expresses the number
+/// of notated 32nd-notes in a MIDI quarter-note (24 MIDI clocks). This was added because there are
+/// already multiple programs which allow a user to specify that what MIDI thinks of as a
+/// quarter-note (24 clocks) is to be notated as, or related to in terms of, something else.
+///
+/// Therefore, the complete event for 6/8 time, where the metronome clicks every three eighth-notes,
+/// but there are 24 clocks per quarter-note, 72 to the bar, would be (in hex):
+///
+/// FF 58 04 06 03 24 08
+///
+/// That is, 6/8 time (8 is 2 to the 3rd power, so this is 06 03), 36 MIDI clocks per dotted-quarter
+/// (24 hex!), and eight notated 32nd-notes per quarter-note.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct TimeSignatureValue {
     /// The upper part of a time signature. For example, in 6/8, the `numerator` is 6.
