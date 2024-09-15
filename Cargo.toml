@@ -1,6 +1,6 @@
 [package]
 name = "midi_file"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Matthew James Briggs <matthew.james.briggs@gmail.com>"]
 edition = "2018"
 exclude = [
@@ -20,9 +20,9 @@ categories = ["encoding"]
 
 [dependencies]
 log = "0.4"
-snafu = "0.7"
+snafu = "0.8"
 
 [dev-dependencies]
 chrono = "0.4"
-env_logger = "0.10"
+env_logger = "0.11"
 tempfile = "3"
