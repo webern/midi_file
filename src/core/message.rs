@@ -82,13 +82,13 @@ impl ProgramChangeValue {
     }
 
     /// Get the channel value.
-    pub fn channel(&self) -> &Channel {
-        &self.channel
+    pub fn channel(&self) -> Channel {
+        self.channel
     }
 
     /// Get the program value.
-    pub fn program(&self) -> &Program {
-        &self.program
+    pub fn program(&self) -> Program {
+        self.program
     }
 }
 
@@ -125,13 +125,13 @@ impl PitchBendMessage {
     }
 
     /// Get the channel value.
-    pub fn channel(&self) -> &Channel {
-        &self.channel
+    pub fn channel(&self) -> Channel {
+        self.channel
     }
 
     /// Get the pitch bend value (0 - 16383).
-    pub fn pitch_bend(&self) -> &PitchBendValue {
-        &self.pitch_bend
+    pub fn pitch_bend(&self) -> PitchBendValue {
+        self.pitch_bend
     }
 }
 
@@ -161,12 +161,15 @@ pub enum ModeMessage {
     PolyModeOn,
 }
 
+/// Represents an on/off state for MIDI messages such as Local Control.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]
 #[derive(Default)]
 pub enum OnOff {
+    /// The "on" state.
     On = 127,
+    /// The "off" state.
     #[default]
     Off = 0,
 }
@@ -855,7 +858,9 @@ impl TryFrom<u8> for Control {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+/// Represents a MIDI Control Change message, which includes a channel, a control number, and a
+/// value.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ControlChangeValue {
     channel: Channel,
     control: Control,

@@ -212,7 +212,7 @@ impl MidiFile {
             self.tracks_len() < u32::MAX,
             error::OtherSnafu { site: site!() }
         );
-        if *self.header().format() == Format::Single {
+        if self.header().format() == Format::Single {
             ensure!(self.tracks_len() <= 1, error::OtherSnafu { site: site!() });
         }
         self.tracks.push(ensure_end_of_track(track)?);
@@ -225,7 +225,7 @@ impl MidiFile {
             self.tracks_len() < u32::MAX,
             error::OtherSnafu { site: site!() }
         );
-        if *self.header().format() == Format::Single {
+        if self.header().format() == Format::Single {
             ensure!(self.tracks_len() <= 1, error::OtherSnafu { site: site!() });
         }
         ensure!(

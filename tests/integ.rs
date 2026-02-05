@@ -13,9 +13,9 @@ use utils::{enable_logging, test_file, AVE_MARIS_STELLA};
 fn ave_maris_stella_finale_export() {
     enable_logging();
     let midi_file = MidiFile::load(test_file(AVE_MARIS_STELLA)).unwrap();
-    assert_eq!(*midi_file.header().format(), Format::Multi);
+    assert_eq!(midi_file.header().format(), Format::Multi);
     assert_eq!(
-        *midi_file.header().division(),
+        midi_file.header().division(),
         Division::QuarterNote(QuarterNoteDivision::new(1024))
     );
     assert_eq!(midi_file.tracks_len(), 2);

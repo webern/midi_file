@@ -29,13 +29,13 @@ impl Header {
     }
 
     /// A getter for the `format` field.
-    pub fn format(&self) -> &Format {
-        &self.format
+    pub fn format(&self) -> Format {
+        self.format
     }
 
     /// A getter for the `division` field.
-    pub fn division(&self) -> &Division {
-        &self.division
+    pub fn division(&self) -> Division {
+        self.division
     }
 
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>, ntracks: u16) -> LibResult<()> {
