@@ -13,8 +13,20 @@ pub struct SysexEvent {
 }
 
 impl SysexEvent {
-    // TODO - implement a `new` function.
-    // TODO - implement getter functions.
+    /// Create a new `SysexEvent`.
+    pub fn new(t: SysexEventType, data: Vec<u8>) -> Self {
+        Self { t, data }
+    }
+
+    /// Getter for the `t` field.
+    pub fn sysex_type(&self) -> &SysexEventType {
+        &self.t
+    }
+
+    /// Getter for the `data` field.
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
 
     pub(crate) fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> LibResult<Self> {
         noimpl!("SysexEvent::parse")

@@ -25,6 +25,15 @@ pub struct NoteMessage {
 }
 
 impl NoteMessage {
+    /// Create a new `NoteMessage`.
+    pub fn new(channel: Channel, note_number: NoteNumber, velocity: Velocity) -> Self {
+        Self {
+            channel,
+            note_number,
+            velocity,
+        }
+    }
+
     /// Getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
@@ -67,6 +76,11 @@ pub struct ProgramChangeValue {
 }
 
 impl ProgramChangeValue {
+    /// Create a new `ProgramChangeValue`.
+    pub fn new(channel: Channel, program: Program) -> Self {
+        Self { channel, program }
+    }
+
     /// Get the channel value.
     pub fn channel(&self) -> &Channel {
         &self.channel
@@ -102,6 +116,14 @@ pub struct PitchBendMessage {
 }
 
 impl PitchBendMessage {
+    /// Create a new `PitchBendMessage`.
+    pub fn new(channel: Channel, pitch_bend: PitchBendValue) -> Self {
+        Self {
+            channel,
+            pitch_bend,
+        }
+    }
+
     /// Get the channel value.
     pub fn channel(&self) -> &Channel {
         &self.channel
@@ -172,6 +194,11 @@ impl Default for ModeMessage {
 }
 
 impl LocalControlValue {
+    /// Create a new `LocalControlValue`.
+    pub fn new(channel: Channel, on_off: OnOff) -> Self {
+        Self { channel, on_off }
+    }
+
     /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
@@ -192,6 +219,14 @@ pub struct MonoModeOnValue {
 }
 
 impl MonoModeOnValue {
+    /// Create a new `MonoModeOnValue`.
+    pub fn new(channel: Channel, mono_mode_channels: MonoModeChannels) -> Self {
+        Self {
+            channel,
+            mono_mode_channels,
+        }
+    }
+
     /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
@@ -828,6 +863,15 @@ pub struct ControlChangeValue {
 }
 
 impl ControlChangeValue {
+    /// Create a new `ControlChangeValue`.
+    pub fn new(channel: Channel, control: Control, value: ControlValue) -> Self {
+        Self {
+            channel,
+            control,
+            value,
+        }
+    }
+
     /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel

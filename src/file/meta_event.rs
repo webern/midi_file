@@ -285,8 +285,35 @@ pub struct SmpteOffsetValue {
 }
 
 impl SmpteOffsetValue {
-    // TODO - create a `new` function.
-    // TODO - create getters.
+    /// Create a new `SmpteOffsetValue`.
+    pub fn new(hr: u8, mn: u8, se: u8, fr: u8, ff: u8) -> Self {
+        Self { hr, mn, se, fr, ff }
+    }
+
+    /// Getter for the `hr` field.
+    pub fn hr(&self) -> u8 {
+        self.hr
+    }
+
+    /// Getter for the `mn` field.
+    pub fn mn(&self) -> u8 {
+        self.mn
+    }
+
+    /// Getter for the `se` field.
+    pub fn se(&self) -> u8 {
+        self.se
+    }
+
+    /// Getter for the `fr` field.
+    pub fn fr(&self) -> u8 {
+        self.fr
+    }
+
+    /// Getter for the `ff` field.
+    pub fn ff(&self) -> u8 {
+        self.ff
+    }
 
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
         // after 0x54 we should see 0x05
