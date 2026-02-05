@@ -143,7 +143,7 @@ impl MidiFile {
 
     /// Read a `MidiFile` from bytes.
     pub fn read<R: Read>(r: R) -> Result<Self> {
-        let bytes = r.bytes();
+        let bytes = std::io::BufReader::new(r).bytes();
         let iter = ByteIter::new(bytes).context(io!())?;
         Ok(Self::read_inner(iter)?)
     }
