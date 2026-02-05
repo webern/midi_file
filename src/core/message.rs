@@ -25,6 +25,15 @@ pub struct NoteMessage {
 }
 
 impl NoteMessage {
+    /// Create a new `NoteMessage`.
+    pub fn new(channel: Channel, note_number: NoteNumber, velocity: Velocity) -> Self {
+        Self {
+            channel,
+            note_number,
+            velocity,
+        }
+    }
+
     /// Getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
@@ -67,14 +76,19 @@ pub struct ProgramChangeValue {
 }
 
 impl ProgramChangeValue {
+    /// Create a new `ProgramChangeValue`.
+    pub fn new(channel: Channel, program: Program) -> Self {
+        Self { channel, program }
+    }
+
     /// Get the channel value.
-    pub fn channel(&self) -> &Channel {
-        &self.channel
+    pub fn channel(&self) -> Channel {
+        self.channel
     }
 
     /// Get the program value.
-    pub fn program(&self) -> &Program {
-        &self.program
+    pub fn program(&self) -> Program {
+        self.program
     }
 }
 
@@ -102,14 +116,22 @@ pub struct PitchBendMessage {
 }
 
 impl PitchBendMessage {
+    /// Create a new `PitchBendMessage`.
+    pub fn new(channel: Channel, pitch_bend: PitchBendValue) -> Self {
+        Self {
+            channel,
+            pitch_bend,
+        }
+    }
+
     /// Get the channel value.
-    pub fn channel(&self) -> &Channel {
-        &self.channel
+    pub fn channel(&self) -> Channel {
+        self.channel
     }
 
     /// Get the pitch bend value (0 - 16383).
-    pub fn pitch_bend(&self) -> &PitchBendValue {
-        &self.pitch_bend
+    pub fn pitch_bend(&self) -> PitchBendValue {
+        self.pitch_bend
     }
 }
 
@@ -139,12 +161,15 @@ pub enum ModeMessage {
     PolyModeOn,
 }
 
+/// Represents an on/off state for MIDI messages such as Local Control.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[allow(dead_code)]
 #[derive(Default)]
 pub enum OnOff {
+    /// The "on" state.
     On = 127,
+    /// The "off" state.
     #[default]
     Off = 0,
 }
@@ -172,6 +197,11 @@ impl Default for ModeMessage {
 }
 
 impl LocalControlValue {
+    /// Create a new `LocalControlValue`.
+    pub fn new(channel: Channel, on_off: OnOff) -> Self {
+        Self { channel, on_off }
+    }
+
     /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
@@ -192,6 +222,14 @@ pub struct MonoModeOnValue {
 }
 
 impl MonoModeOnValue {
+    /// Create a new `MonoModeOnValue`.
+    pub fn new(channel: Channel, mono_mode_channels: MonoModeChannels) -> Self {
+        Self {
+            channel,
+            mono_mode_channels,
+        }
+    }
+
     /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
@@ -820,7 +858,9 @@ impl TryFrom<u8> for Control {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+/// Represents a MIDI Control Change message, which includes a channel, a control number, and a
+/// value.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ControlChangeValue {
     channel: Channel,
     control: Control,
@@ -828,6 +868,15 @@ pub struct ControlChangeValue {
 }
 
 impl ControlChangeValue {
+    /// Create a new `ControlChangeValue`.
+    pub fn new(channel: Channel, control: Control, value: ControlValue) -> Self {
+        Self {
+            channel,
+            control,
+            value,
+        }
+    }
+
     /// A getter for the `channel` field.
     pub fn channel(&self) -> Channel {
         self.channel
