@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 /// The public Error type for this library.
 #[derive(Debug, Snafu)]
+#[snafu(source(from(exact)))]
 pub struct Error(LibError);
 
 /// The public Result type for this library.
