@@ -1,5 +1,5 @@
 use crate::byte_iter::ByteIter;
-use crate::error::LibResult;
+use crate::error::Result;
 use crate::scribe::Scribe;
 use std::io::{Read, Write};
 
@@ -28,11 +28,11 @@ impl SysexEvent {
         &self.data
     }
 
-    pub(crate) fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> Result<Self> {
         noimpl!("SysexEvent::parse")
     }
 
-    pub(crate) fn write<W: Write>(&self, _w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, _w: &mut Scribe<W>) -> Result<()> {
         noimpl!("SysexEvent::write")
     }
 }

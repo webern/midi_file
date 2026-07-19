@@ -4,15 +4,13 @@ use crate::core::{
     Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, Program, StatusType,
     Velocity,
 };
-use crate::error::{self, LibResult};
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
-use log::{trace, warn};
-use snafu::{OptionExt, ResultExt};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 pub(crate) trait WriteBytes {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()>;
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()>;
 }
 
 /// Represents the data that is common, and required for both [`Message::NoteOn`] and
@@ -49,7 +47,7 @@ impl NoteMessage {
         self.velocity
     }
 
-    fn parse<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Self> {
+    fn parse<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> Result<Self> {
         Ok(NoteMessage {
             channel,
             note_number: iter.read_or_die().context(io!())?.into(),
@@ -57,7 +55,7 @@ impl NoteMessage {
         })
     }
 
-    fn write<W: Write>(&self, w: &mut Scribe<W>, st: StatusType) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>, st: StatusType) -> Result<()> {
         write_status_byte(w, st, self.channel)?;
         w.write_all(&self.note_number.get().to_be_bytes())
             .context(wr!())?;
@@ -93,7 +91,7 @@ impl ProgramChangeValue {
 }
 
 impl WriteBytes for ProgramChangeValue {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_status_byte(w, StatusType::Program, self.channel)?;
         write_u8!(w, self.program.get())?;
         Ok(())
@@ -136,7 +134,7 @@ impl PitchBendMessage {
 }
 
 impl WriteBytes for PitchBendMessage {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_status_byte(w, StatusType::PitchBend, self.channel)?;
         let decoded = self.pitch_bend.get();
         let encoded = encode_14_bit_number(decoded);
@@ -346,15 +344,14 @@ impl Default for Message {
 }
 
 impl Message {
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         // check if the first byte is a status byte. if not, then this should be a running status
         // message.
         let byte = if matches!(iter.peek_or_die().context(io!())?, 0x00..=0x7F) {
             iter.set_running_status_detected();
             let running_status = iter
                 .latest_message_byte()
-                .context(error::RunningStatusSnafu { site: site!() })?;
-            trace!("running status byte {:#x}", running_status);
+                .context(ctx!(crate::error::ErrorType::RunningStatus))?;
             running_status
         } else {
             let byte = iter.read_or_die().context(io!())?;
@@ -397,7 +394,7 @@ impl Message {
                 noimpl!("channel pressure: https://github.com/webern/midi_file/issues/X")
             }
             StatusType::PitchBend => {
-                let value = iter.read_u16().unwrap();
+                let value = iter.read_u16().context(io!()).unwrap();
                 let decoded = decode_14_bit_number(value);
                 Ok(Message::PitchBend(PitchBendMessage {
                     channel,
@@ -408,7 +405,7 @@ impl Message {
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         match self {
             Message::NoteOff(value) => value.write(w, StatusType::NoteOff),
             Message::NoteOn(value) => value.write(w, StatusType::NoteOn),
@@ -484,7 +481,7 @@ pub(crate) const CONTROL_MONO_MODE_ON: u8 = 126;
 pub(crate) const CONTROL_POLY_MODE_ON: u8 = 127;
 
 /// Returns (4-bit status part, 4-bit channel).
-fn split_byte(status_byte: u8) -> LibResult<(StatusType, Channel)> {
+fn split_byte(status_byte: u8) -> Result<(StatusType, Channel)> {
     let status_type_val = status_byte >> 4;
     let status_type = StatusType::from_u8(status_type_val)?;
     let channel_value = status_byte & 0b0000_1111;
@@ -505,12 +502,12 @@ fn write_status_byte<W: Write>(
     w: &mut Scribe<W>,
     status: StatusType,
     channel: Channel,
-) -> LibResult<()> {
+) -> Result<()> {
     let data = merge_byte(status, channel);
     w.write_status_byte(data)
 }
 
-fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Message> {
+fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> Result<Message> {
     let first_data_byte = iter.read_or_die().context(io!())?;
     match first_data_byte {
         0..=119 => parse_control(iter, channel, first_data_byte),
@@ -519,7 +516,7 @@ fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Mes
     }
 }
 
-fn parse_chanmod<R>(it: &mut ByteIter<R>, chan: Channel, first_byte: u8) -> LibResult<Message>
+fn parse_chanmod<R>(it: &mut ByteIter<R>, chan: Channel, first_byte: u8) -> Result<Message>
 where
     R: Read,
 {
@@ -528,15 +525,10 @@ where
         CONTROL_ALL_SOUNDS_OFF => Ok(Message::AllSoundsOff(chan)),
         CONTROL_RESET_ALL_CONTROLLERS => Ok(Message::ResetAllControllers(chan)),
         CONTROL_LOCAL_CONTROL => {
+            // The spec says 127 for "on", but anything nonzero is treated as "on".
             if second_byte == 0 {
                 Ok(Message::LocalControlOff(chan))
             } else {
-                if second_byte != 127 {
-                    warn!(
-                        "unexpected local control on value, {}, setting to 127",
-                        second_byte
-                    )
-                }
                 Ok(Message::LocalControlOn(chan))
             }
         }
@@ -552,7 +544,7 @@ where
     }
 }
 
-fn write_chanmod<W>(w: &mut Scribe<W>, channel: Channel, controller: u8, value: u8) -> LibResult<()>
+fn write_chanmod<W>(w: &mut Scribe<W>, channel: Channel, controller: u8, value: u8) -> Result<()>
 where
     W: Write,
 {
@@ -565,7 +557,7 @@ where
     Ok(())
 }
 
-fn parse_control<R>(it: &mut ByteIter<R>, chan: Channel, first_data_byte: u8) -> LibResult<Message>
+fn parse_control<R>(it: &mut ByteIter<R>, chan: Channel, first_data_byte: u8) -> Result<Message>
 where
     R: Read,
 {
@@ -713,7 +705,7 @@ pub enum Control {
 }
 
 impl Control {
-    pub(crate) fn try_from_u8(value: u8) -> LibResult<Self> {
+    pub(crate) fn try_from_u8(value: u8) -> Result<Self> {
         match value {
             x if x == Control::BankSelect as u8 => Ok(Control::BankSelect),
             x if x == Control::ModWheel as u8 => Ok(Control::ModWheel),
@@ -845,7 +837,7 @@ impl Control {
             x if x == Control::Undefined117 as u8 => Ok(Control::Undefined117),
             x if x == Control::Undefined118 as u8 => Ok(Control::Undefined118),
             x if x == Control::Undefined119 as u8 => Ok(Control::Undefined119),
-            _ => error::OtherSnafu { site: site!() }.fail(),
+            _ => ctx!(crate::error::ErrorType::Other)().fail(),
         }
     }
 }
@@ -853,8 +845,8 @@ impl Control {
 impl TryFrom<u8> for Control {
     type Error = crate::Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(Self::try_from_u8(value)?)
+    fn try_from(value: u8) -> crate::Result<Self> {
+        Self::try_from_u8(value)
     }
 }
 
@@ -894,7 +886,7 @@ impl ControlChangeValue {
 }
 
 impl WriteBytes for ControlChangeValue {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_status_byte(w, StatusType::ControlOrSelectChannelMode, self.channel)?;
         write_u8!(w, self.control as u8)?;
         write_u8!(w, self.value.get())?;

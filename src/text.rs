@@ -3,7 +3,6 @@
 //! that holds a `UTF-8` `String` whenever possible, but reverts to holding raw bytes when the bytes
 //! are not valid `UTF-8`.
 
-use log::warn;
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
@@ -37,10 +36,7 @@ impl From<Vec<u8>> for Text {
     fn from(bytes: Vec<u8>) -> Self {
         match String::from_utf8(bytes.clone()) {
             Ok(s) => Text::Utf8(s),
-            Err(_) => {
-                warn!("non UTF-8 string encountered, encoding unknown");
-                Text::Other(bytes)
-            }
+            Err(_) => Text::Other(bytes),
         }
     }
 }

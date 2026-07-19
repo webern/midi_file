@@ -19,10 +19,10 @@ keywords = ["MIDI"]
 categories = ["encoding"]
 
 [dependencies]
-log = "0.4"
-snafu = "0.9"
 
 [dev-dependencies]
 chrono = "0.4"
 env_logger = "0.11"
+# Test harness only; the library emits no log records.
+log = "0.4"
 tempfile = "3"

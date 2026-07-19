@@ -1,7 +1,6 @@
-use crate::error::LibResult;
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
 use crate::Error;
-use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::Write;
 
@@ -38,19 +37,19 @@ impl Default for Division {
 const DIVISION_TYPE_BIT: u16 = 0b1000000000000000;
 
 impl Division {
-    pub(crate) fn from_u16(value: u16) -> LibResult<Self> {
+    pub(crate) fn from_u16(value: u16) -> Result<Self> {
         if value & DIVISION_TYPE_BIT == DIVISION_TYPE_BIT {
             // TODO - implement SMPTE division
-            crate::error::OtherSnafu { site: site!() }.fail()
+            ctx!(crate::error::ErrorType::Other)().fail()
         } else {
             Ok(Division::QuarterNote(QuarterNoteDivision::new(value)))
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         match self {
             Division::QuarterNote(q) => Ok(w.write_all(&q.get().to_be_bytes()).context(wr!())?),
-            Division::Smpte(_) => crate::error::OtherSnafu { site: site!() }.fail(),
+            Division::Smpte(_) => ctx!(crate::error::ErrorType::Other)().fail(),
         }
     }
 }
@@ -59,7 +58,7 @@ impl TryFrom<u16> for Division {
     type Error = Error;
 
     fn try_from(value: u16) -> crate::Result<Self> {
-        Ok(Division::from_u16(value)?)
+        Division::from_u16(value)
     }
 }
 

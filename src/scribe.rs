@@ -1,5 +1,4 @@
-use crate::error::LibResult;
-use snafu::ResultExt;
+use crate::error::Result;
 use std::io::Write;
 
 #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
@@ -37,7 +36,7 @@ impl<W: Write> Scribe<W> {
 
     /// Write a status byte. If `running_status` is `true`, and the `status` byte is the same as
     /// `previous_status`, then nothing happens.
-    pub(crate) fn write_status_byte(&mut self, status: u8) -> LibResult<()> {
+    pub(crate) fn write_status_byte(&mut self, status: u8) -> Result<()> {
         match self.running_status() {
             Some(previous_status) if previous_status == status => Ok(()),
             _ => {

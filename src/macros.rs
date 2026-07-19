@@ -2,9 +2,10 @@
 
 /// A macro for conveniently writing bytes to a `Write` object and converting the error.
 macro_rules! write_u8 {
-    ($w:expr, $val:expr) => {
+    ($w:expr, $val:expr) => {{
+        use crate::error::Context as _;
         $w.write_all(&[$val]).context(wr!())
-    };
+    }};
 }
 
 // TODO - maybe use const generics instead when available

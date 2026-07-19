@@ -1,4 +1,4 @@
-use crate::error::LibResult;
+use crate::error::Result;
 use crate::Error;
 use std::convert::TryFrom;
 
@@ -47,7 +47,7 @@ pub enum DurationName {
 }
 
 impl DurationName {
-    pub(crate) fn from_u8(v: u8) -> LibResult<Self> {
+    pub(crate) fn from_u8(v: u8) -> Result<Self> {
         match v {
             v if DurationName::Whole as u8 == v => Ok(DurationName::Whole),
             v if DurationName::Half as u8 == v => Ok(DurationName::Half),
@@ -60,7 +60,7 @@ impl DurationName {
             v if DurationName::D256 as u8 == v => Ok(DurationName::D256),
             v if DurationName::D512 as u8 == v => Ok(DurationName::D512),
             v if DurationName::D1024 as u8 == v => Ok(DurationName::D1024),
-            _ => crate::error::OtherSnafu { site: site!() }.fail(),
+            _ => ctx!(crate::error::ErrorType::Other)().fail(),
         }
     }
 }
@@ -69,6 +69,6 @@ impl TryFrom<u8> for DurationName {
     type Error = Error;
 
     fn try_from(value: u8) -> crate::Result<Self> {
-        Ok(Self::from_u8(value)?)
+        Self::from_u8(value)
     }
 }

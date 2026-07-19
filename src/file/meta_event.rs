@@ -1,10 +1,9 @@
 use crate::byte_iter::ByteIter;
 use crate::core::vlq::Vlq;
 use crate::core::{Channel, Clocks, DurationName, PortValue};
-use crate::error::{self, LibResult};
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
-use crate::{Result, Text};
-use snafu::{ensure, OptionExt, ResultExt};
+use crate::Text;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
@@ -151,7 +150,7 @@ pub enum MetaEvent {
 }
 
 impl MetaEvent {
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         iter.read_expect(0xff).context(io!())?;
         let meta_type_byte = iter.read_or_die().context(io!())?;
         match meta_type_byte {
@@ -181,7 +180,7 @@ impl MetaEvent {
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
             MetaEvent::SequenceNumber => {
@@ -232,17 +231,17 @@ impl MetaEvent {
         }
     }
 
-    pub(crate) fn parse_end_of_track<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse_end_of_track<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         // after 0x2f we should see 0x00
         iter.read_expect(0x00).context(io!())?;
         Ok(MetaEvent::EndOfTrack)
     }
 
-    pub(crate) fn parse_text<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse_text<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         // we should be on a type-byte with a value between 0x01 and 0x09 (the text range).
         let text_type = iter
             .current()
-            .context(error::OtherSnafu { site: site!() })?;
+            .context(ctx!(crate::error::ErrorType::Other))?;
         let length = iter.read_vlq_u32().context(io!())?;
         let bytes = iter.read_n(length as usize).context(io!())?;
         // the spec does not strictly specify what encoding should be used for strings
@@ -262,11 +261,11 @@ impl MetaEvent {
     }
 }
 
-fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> LibResult<()> {
+fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> Result<()> {
     w.write_all(&text_type.to_be_bytes()).context(wr!())?;
     let bytes = text.as_bytes();
     let size_u32 =
-        u32::try_from(bytes.len()).context(error::StringTooLongSnafu { site: site!() })?;
+        u32::try_from(bytes.len()).context(ctx!(crate::error::ErrorType::StringTooLong))?;
     let size = Vlq::new(size_u32).to_bytes();
     w.write_all(&size).context(wr!())?;
     w.write_all(bytes).context(wr!())?;
@@ -315,7 +314,7 @@ impl SmpteOffsetValue {
         self.ff
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         // after 0x54 we should see 0x05
         iter.read_expect(LEN_META_SMTPE_OFFSET).context(io!())?;
         Ok(Self {
@@ -327,7 +326,7 @@ impl SmpteOffsetValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_u8!(w, META_SMTPE_OFFSET)?;
         write_u8!(w, LEN_META_SMTPE_OFFSET)?;
         write_u8!(w, self.hr)?;
@@ -411,7 +410,7 @@ pub struct TimeSignatureValue {
 impl TimeSignatureValue {
     /// Create a new `TimeSignatureValue` object.
     pub fn new(numerator: u8, denominator: DurationName, click: Clocks) -> Result<Self> {
-        ensure!(numerator > 0, error::OtherSnafu { site: site!() });
+        ensure!(numerator > 0, ctx!(crate::error::ErrorType::Other));
         Ok(Self {
             numerator,
             denominator,
@@ -435,7 +434,7 @@ impl TimeSignatureValue {
         self.click
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         iter.read_expect(LEN_META_TIME_SIG).context(io!())?;
         Ok(Self {
             numerator: iter.read_or_die().context(io!())?,
@@ -445,7 +444,7 @@ impl TimeSignatureValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_u8!(w, META_TIME_SIG)?;
         write_u8!(w, LEN_META_TIME_SIG)?;
         write_u8!(w, self.numerator)?;
@@ -497,7 +496,7 @@ impl KeySignatureValue {
         self.mode
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         iter.read_expect(LEN_META_KEY_SIG).context(io!())?;
         let raw_accidentals_byte = iter.read_or_die().context(io!())?;
         let casted_accidentals = raw_accidentals_byte as i8;
@@ -510,7 +509,7 @@ impl KeySignatureValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_u8!(w, META_KEY_SIG)?;
         write_u8!(w, LEN_META_KEY_SIG)?;
         write_u8!(w, self.accidentals.get() as u8)?;
@@ -550,7 +549,7 @@ clamp!(
 );
 
 impl MicrosecondsPerQuarter {
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         iter.read_expect(LEN_META_SET_TEMPO).context(io!())?;
         let bytes = iter.read_n(LEN_META_SET_TEMPO as usize).context(io!())?;
         // bytes is a big-endian u24. fit it into a big-endian u32 then parse it

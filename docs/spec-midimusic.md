@@ -13,7 +13,7 @@ Acknowledgement section below for the terms this copy is distributed under.
 
 A detailed Specification of the Standard MIDI file format
 
-## Table of Contents
+# Table of Contents
 
 - [0 - Introduction](#0---introduction)
 - [1 - Sequences, Tracks, Chunks: File Block Structure](#1---sequences-tracks-chunks-file-block-structure)
