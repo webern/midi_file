@@ -33,7 +33,7 @@ pub enum MetaEvent {
     /// 1 MIDI file, which only contain one sequence, this number should be contained in the first (or only) track. If
     /// transfer of several multitrack sequences is required, this must be done as a group of format 1 files, each with
     /// a different sequence number.
-    SequenceNumber, // TODO - some value here
+    SequenceNumber(u16),
 
     /// `FF 01 len text`: Any amount of text describing anything. It is a good idea to put a text event right at the
     /// beginning of a track, with the name of the track, a description of its intended orchestration, and any other
@@ -167,8 +167,8 @@ impl MetaEvent {
         // a recognized meta type with a length other than the one the spec gives it is treated as
         // unrecognized so that its bytes are preserved verbatim rather than misinterpreted.
         match (meta_type, length) {
-            (META_SEQUENCE_NUM, 2) => {
-                noimpl!("Sequence Number: https://github.com/webern/midi_file/issues/8")
+            (META_SEQUENCE_NUM, len) if len == LEN_META_SEQUENCE_NUM as u32 => {
+                Ok(MetaEvent::SequenceNumber(iter.read_u16().context(io!())?))
             }
             (META_TEXT..=META_DEVICE_NAME, _) => MetaEvent::parse_text(iter, meta_type, length),
             (META_CHAN_PREFIX, len) if len == LEN_META_CHAN_PREFIX as u32 => Ok(
@@ -203,8 +203,10 @@ impl MetaEvent {
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
-            MetaEvent::SequenceNumber => {
-                noimpl!("Sequence Number: https://github.com/webern/midi_file/issues/8")
+            MetaEvent::SequenceNumber(value) => {
+                write_u8!(w, META_SEQUENCE_NUM)?;
+                write_u8!(w, LEN_META_SEQUENCE_NUM)?;
+                w.write_all(&value.to_be_bytes()).context(wr!())
             }
             MetaEvent::OtherText(s) => write_text(w, 0x01, s),
             MetaEvent::Copyright(s) => write_text(w, 0x02, s),
@@ -409,7 +411,7 @@ pub(crate) const META_SEQ_SPECIFIC: u8 = 0x7f;
 /// http://www.verycomputer.com/47_f2ad3c41e745127b_1.htm
 pub(crate) const META_PORT: u8 = 0x21;
 
-// #[allow(dead_code)] // TODO - implement
+pub(crate) const LEN_META_SEQUENCE_NUM: u8 = 2;
 pub(crate) const LEN_META_CHAN_PREFIX: u8 = 1;
 pub(crate) const LEN_META_END_OF_TRACK: u8 = 0;
 pub(crate) const LEN_META_SET_TEMPO: u8 = 3;
