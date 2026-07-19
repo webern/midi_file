@@ -36,6 +36,38 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/11
+/// Spec 2.1: SMPTE division has bit 15 set, a negative two's complement frame rate in bits 14-8,
+/// and the ticks-per-frame resolution in bits 7-0. E250 is 30 fps at bit resolution (80).
+#[test]
+fn smpte_division() {
+    use midi_file::file::{Division, FrameRate, SmpteRate};
+    let bytes = file_with_division(&[0xE2, 0x50]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    match mf.header().division() {
+        Division::Smpte(s) => {
+            assert_eq!(FrameRate::N30, s.frame_rate());
+            assert_eq!(80, s.resolution());
+        }
+        d => panic!("wrong division {:?}", d),
+    }
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+
+    // the spec's millisecond example: 25 frames/sec, 40 units per frame. -25 is 0xE7.
+    let bytes = file_with_division(&[0xE7, 0x28]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    assert_eq!(
+        Division::Smpte(SmpteRate::new(FrameRate::N25, 40)),
+        mf.header().division()
+    );
+
+    // an invalid frame rate errors
+    let bytes = file_with_division(&[0xFF, 0x28]);
+    assert!(MidiFile::read(bytes.as_slice()).is_err());
+}
+
 /// https://github.com/webern/midi_file/issues/29
 /// Spec 2.3: "Sysex events and meta events cancel any running status which was in effect."
 #[test]

@@ -8,7 +8,7 @@ mod meta_event;
 mod sysex;
 mod track;
 
-pub use division::{Division, QuarterNoteDivision};
+pub use division::{Division, FrameRate, QuarterNoteDivision, SmpteRate};
 pub use event::{Event, TrackEvent};
 pub use header::{Format, Header};
 pub use meta_event::{
