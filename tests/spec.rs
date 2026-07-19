@@ -36,6 +36,64 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/10
+/// Channel pressure (0xD), system common (0xF1, 0xF2, 0xF3, 0xF6), and system realtime messages
+/// parse and roundtrip.
+#[test]
+fn channel_pressure_and_system_messages() {
+    use midi_file::core::Message;
+    use midi_file::file::Event;
+    let bytes = file_with_track_data(&[
+        0x00, 0xD3, 0x42, // channel pressure, channel 3, value 0x42
+        0x00, 0xF1, 0x25, // MIDI time code quarter frame
+        0x00, 0xF2, 0x64, 0x40, // song position pointer, lsb first: 0x64 | (0x40 << 7)
+        0x00, 0xF3, 0x05, // song select, song 5
+        0x00, 0xF6, // tune request
+        0x00, 0xF8, // timing clock
+        0x00, 0xFA, // start
+        0x00, 0xFB, // continue
+        0x00, 0xFC, // stop
+        0x00, 0xFE, // active sensing
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    let track = mf.tracks().next().unwrap();
+    let mut events = track.events();
+    let mut next = || match events.next().unwrap().event() {
+        Event::Midi(m) => *m,
+        e => panic!("wrong event {:?}", e),
+    };
+    match next() {
+        Message::ChannelPressure(m) => {
+            assert_eq!(3, m.channel().get());
+            assert_eq!(0x42, m.pressure().get());
+        }
+        m => panic!("wrong message {:?}", m),
+    }
+    match next() {
+        Message::MidiTimeCodeQuarterFrame(m) => assert_eq!(0x25, m.value().get()),
+        m => panic!("wrong message {:?}", m),
+    }
+    match next() {
+        Message::SongPositionPointer(m) => assert_eq!(0x64 | (0x40 << 7), m.position().get()),
+        m => panic!("wrong message {:?}", m),
+    }
+    match next() {
+        Message::SongSelect(m) => assert_eq!(5, m.song().get()),
+        m => panic!("wrong message {:?}", m),
+    }
+    assert!(matches!(next(), Message::TuneRequest));
+    assert!(matches!(next(), Message::TimingClock));
+    assert!(matches!(next(), Message::Start));
+    assert!(matches!(next(), Message::Continue));
+    assert!(matches!(next(), Message::Stop));
+    assert!(matches!(next(), Message::ActiveSensing));
+
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+}
+
 /// https://github.com/webern/midi_file/issues/7
 /// Spec 2.3: F0 and F7 sysex events. The spec's example: the transmitted message
 /// F0 43 12 00 07 F7 is stored as F0 05 43 12 00 07 F7.

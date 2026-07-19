@@ -85,3 +85,49 @@ clamp!(
     8192,
     pub
 );
+
+clamp!(
+    /// Represents a MIDI channel pressure (after-touch) amount. The minimum value is `0`, the
+    /// maximum value is `127` (i.e. `u7`). This type will clamp values to the valid range.
+    PressureValue,
+    u8,
+    0,
+    127,
+    0,
+    pub
+);
+
+clamp!(
+    /// Represents the data byte of a MIDI time code quarter frame message: a 3-bit message type
+    /// and a 4-bit value packed as `0nnndddd`. The minimum value is `0`, the maximum value is
+    /// `127` (i.e. `u7`). This type will clamp values to the valid range.
+    QuarterFrameValue,
+    u8,
+    0,
+    127,
+    0,
+    pub
+);
+
+clamp!(
+    /// Represents a song position in MIDI beats (1 beat = six MIDI clocks) since the start of the
+    /// song. The minimum value is `0`, the maximum value is `16383` (i.e. `u14`). This type will
+    /// clamp values to the valid range.
+    SongPosition,
+    u16,
+    0,
+    16383,
+    0,
+    pub
+);
+
+clamp!(
+    /// Represents the song or sequence number of a song select message. The minimum value is `0`,
+    /// the maximum value is `127` (i.e. `u7`). This type will clamp values to the valid range.
+    SongNumber,
+    u8,
+    0,
+    127,
+    0,
+    pub
+);

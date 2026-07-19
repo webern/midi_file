@@ -16,11 +16,12 @@ pub use clocks::Clocks;
 pub use duration_name::DurationName;
 pub use general_midi::GeneralMidi;
 pub use message::{
-    Control, ControlChangeValue, LocalControlValue, Message, MonoModeOnValue, NoteMessage, OnOff,
-    PitchBendMessage, ProgramChangeValue,
+    ChannelPressureMessage, Control, ControlChangeValue, LocalControlValue, Message,
+    MidiTimeCodeQuarterFrameMessage, MonoModeOnValue, NoteMessage, OnOff, PitchBendMessage,
+    ProgramChangeValue, SongPositionPointerMessage, SongSelectMessage,
 };
 pub use numbers::{
-    Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, PortValue, Program,
-    Velocity,
+    Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, PortValue, PressureValue,
+    Program, QuarterFrameValue, SongNumber, SongPosition, Velocity,
 };
 pub use status_type::StatusType;

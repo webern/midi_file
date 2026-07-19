@@ -51,9 +51,6 @@ pub enum ErrorType {
     /// A track's length overflows the `u32` its length field is stored in.
     TrackTooLong,
 
-    /// A part of the MIDI spec that this library does not yet support.
-    Unimplemented,
-
     /// Something went wrong that has no more specific classification.
     Other,
 }
@@ -76,7 +73,6 @@ impl ErrorType {
             ErrorType::StringTooLong => "the string is too long and overflows a u32",
             ErrorType::TooManyTracks => "there are too many tracks for a 16-bit uint",
             ErrorType::TrackTooLong => "the track is too long and overflows a u32",
-            ErrorType::Unimplemented => "the feature is not yet implemented",
             ErrorType::Other => "unknown error",
         }
     }
@@ -304,18 +300,6 @@ macro_rules! invalid_file {
     };
     ($fmt:expr, $($arg:expr),+) => {
         return Err(invalid_file_e!($fmt, $($arg),+))
-    };
-}
-
-/// Return early, reporting that `$name` is a part of the spec we do not support yet.
-macro_rules! noimpl {
-    ($name:expr) => {
-        return ctx!(
-            crate::error::ErrorType::Unimplemented,
-            "the '{}' feature is not yet implemented",
-            $name
-        )()
-        .fail()
     };
 }
 
