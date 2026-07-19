@@ -36,6 +36,61 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/30
+/// Spec 2.3: "programs must properly ignore meta-events which they do not recognise, and indeed
+/// should expect to see them." Unknown meta events are retained as raw bytes and roundtrip.
+#[test]
+fn unknown_meta_events_are_preserved() {
+    use midi_file::file::{Event, MetaEvent};
+    let bytes = file_with_track_data(&[
+        0x00, 0xFF, 0x60, 0x01, 0x7F, // unknown meta type 0x60, len 1
+        0x00, 0xFF, 0x0A, 0x01, 0x41, // reserved text meta type 0x0A, len 1, "A"
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    let track = mf.tracks().next().unwrap();
+    let mut events = track.events();
+    match events.next().unwrap().event() {
+        Event::Meta(MetaEvent::Unknown(u)) => {
+            assert_eq!(0x60, u.meta_type());
+            assert_eq!(&[0x7F], u.data());
+        }
+        e => panic!("wrong event {:?}", e),
+    }
+    match events.next().unwrap().event() {
+        Event::Meta(MetaEvent::Unknown(u)) => {
+            assert_eq!(0x0A, u.meta_type());
+            assert_eq!(&[0x41], u.data());
+        }
+        e => panic!("wrong event {:?}", e),
+    }
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+}
+
+/// https://github.com/webern/midi_file/issues/30
+/// A known meta type with a length other than the one the spec assigns is preserved verbatim as
+/// an unknown meta event instead of being rejected or misinterpreted.
+#[test]
+fn known_meta_type_with_unexpected_length_is_preserved() {
+    use midi_file::file::{Event, MetaEvent};
+    // a set tempo event with four data bytes instead of three
+    let bytes = file_with_track_data(&[
+        0x00, 0xFF, 0x51, 0x04, 0x07, 0xA1, 0x20, 0x00, //
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    let track = mf.tracks().next().unwrap();
+    match track.events().next().unwrap().event() {
+        Event::Meta(MetaEvent::Unknown(u)) => assert_eq!(0x51, u.meta_type()),
+        e => panic!("wrong event {:?}", e),
+    }
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+}
+
 /// https://github.com/webern/midi_file/issues/32
 /// Spec 1.3: "Your programs should EXPECT alien chunks and treat them as if they weren't there."
 #[test]

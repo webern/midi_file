@@ -255,10 +255,6 @@ impl<R: Read> ByteIter<R> {
         })
     }
 
-    pub(crate) fn current(&self) -> Option<u8> {
-        self.current
-    }
-
     pub(crate) fn peek_or_die(&self) -> ByteResult<u8> {
         self.peek1.ok_or(ByteError::End {
             position: self.pos(),
@@ -367,7 +363,7 @@ fn byte_iter_test() {
     assert!(!iter.is_end());
     assert_eq!(0x03, iter.read().unwrap().unwrap());
     assert_eq!(0x04, iter.read().unwrap().unwrap());
-    assert_eq!(0x04, iter.current().unwrap());
+    assert_eq!(0x04, iter.current.unwrap());
     assert!(iter.read().unwrap().is_none());
     iter.clear_size_limit();
     assert_eq!(0x10, iter.read().unwrap().unwrap());

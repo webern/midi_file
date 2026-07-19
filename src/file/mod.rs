@@ -11,7 +11,9 @@ mod track;
 pub use division::{Division, QuarterNoteDivision};
 pub use event::{Event, TrackEvent};
 pub use header::{Format, Header};
-pub use meta_event::{MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue};
+pub use meta_event::{
+    MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue, UnknownMetaEvent,
+};
 pub use sysex::{SysexEvent, SysexEventType};
 pub use track::Track;
 
