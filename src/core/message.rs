@@ -356,34 +356,60 @@ impl SongSelectMessage {
 /// byte for these messages. System messages are not Channel specific, and no Channel number is
 /// indicated in their status bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[allow(missing_docs)]
 pub enum Message {
+    /// `0x8`: sent when a note is released.
     NoteOff(NoteMessage),
+    /// `0x9`: sent when a note is depressed. A velocity of 0 acts as a note off.
     NoteOn(NoteMessage),
+    /// `0xA`: polyphonic key pressure (aftertouch) for an individual key.
     PolyPressure(NoteMessage),
+    /// `0xB` with a controller number 0-119: a control change.
     Control(ControlChangeValue),
+    /// `0xC`: changes the patch (instrument sound) on a channel.
     ProgramChange(ProgramChangeValue),
+    /// `0xD`: channel pressure (aftertouch), the greatest pressure of all depressed keys.
     ChannelPressure(ChannelPressureMessage),
+    /// `0xE`: a change in the pitch wheel, measured by a fourteen-bit value.
     PitchBend(PitchBendMessage),
+    /// `0xB` controller 120: turns all sound on the channel off.
     AllSoundsOff(Channel),
+    /// `0xB` controller 121: resets all controllers on the channel.
     ResetAllControllers(Channel),
+    /// `0xB` controller 122, value 0: the keyboard responds only to received MIDI data.
     LocalControlOff(Channel),
+    /// `0xB` controller 122, value 127: restores the normal keyboard-to-sound connection.
     LocalControlOn(Channel),
+    /// `0xB` controller 123: turns all notes on the channel off.
     AllNotesOff(Channel),
+    /// `0xB` controller 124: omni mode off (also causes all notes off).
     OmniModeOff(Channel),
+    /// `0xB` controller 125: omni mode on (also causes all notes off).
     OmniModeOn(Channel),
+    /// `0xB` controller 126: mono mode on, i.e. poly mode off (also causes all notes off).
     MonoModeOn(MonoModeOnValue),
+    /// `0xB` controller 127: poly mode on, i.e. mono mode off (also causes all notes off).
     PolyModeOn(Channel),
+    /// `0xF1`: a MIDI time code quarter frame.
     MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage),
+    /// `0xF2`: the number of MIDI beats since the start of the song.
     SongPositionPointer(SongPositionPointerMessage),
+    /// `0xF3`: specifies which sequence or song is to be played.
     SongSelect(SongSelectMessage),
+    /// `0xF6`: upon receiving this, all analog synthesizers should tune their oscillators.
     TuneRequest,
+    /// `0xF8`: sent 24 times per quarter note when synchronization is required.
     TimingClock,
+    /// `0xF9`: an undefined system realtime status byte.
     Undefined1,
+    /// `0xFA`: start the current sequence playing.
     Start,
+    /// `0xFB`: continue at the point the sequence was stopped.
     Continue,
+    /// `0xFC`: stop the current sequence.
     Stop,
+    /// `0xFD`: an undefined system realtime status byte.
     Undefined2,
+    /// `0xFE`: sent every 300ms (max) when the connection should be presumed alive.
     ActiveSensing,
 }
 

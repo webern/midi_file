@@ -332,7 +332,9 @@ fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> Result
     Ok(())
 }
 
-// TODO - create some interface for this, constrict it's values, etc.
+/// The value of a [`MetaEvent::SmpteOffset`] event: the SMPTE time at which the track chunk is
+/// supposed to start, as `hr mn se fr ff`.
+// TODO - constrict the values, interpret the hour's SMPTE format bits, etc.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct SmpteOffsetValue {
     // TODO - these are held as raw bytes for now without caring about their meaning or signedness.
@@ -524,13 +526,18 @@ clamp!(
     pub
 );
 
+/// The `mi` byte of a [`MetaEvent::KeySignature`] event: 0 for major, 1 for minor.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum KeyMode {
+    /// `mi = 0`: major key
     #[default]
     Major,
+    /// `mi = 1`: minor key
     Minor,
 }
 
+/// The value of a [`MetaEvent::KeySignature`] event: the number of sharps or flats and whether the
+/// key is major or minor.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct KeySignatureValue {
     accidentals: KeyAccidentals,
