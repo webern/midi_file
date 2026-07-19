@@ -9,3 +9,5 @@ Test files are in `tests/data`. We expect these to roundtrip through the library
 
 The `Makefile` provides canonical build commands. `make ci` is the gate used by continuous
 integration.
+
+No `dependencies`: this library does not require dependencies in its Cargo.toml. Keep it that way.

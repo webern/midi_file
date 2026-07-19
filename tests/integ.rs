@@ -7,11 +7,10 @@ use midi_file::MidiFile;
 use std::fs::File;
 use std::io::Read;
 use tempfile::tempdir;
-use utils::{enable_logging, test_file, AVE_MARIS_STELLA};
+use utils::{test_file, AVE_MARIS_STELLA};
 
 #[test]
 fn ave_maris_stella_finale_export() {
-    enable_logging();
     let midi_file = MidiFile::load(test_file(AVE_MARIS_STELLA)).unwrap();
     assert_eq!(midi_file.header().format(), Format::Multi);
     assert_eq!(
@@ -181,7 +180,6 @@ fn ave_maris_stella_finale_export() {
 
 #[test]
 fn pitch_bend() {
-    enable_logging();
     let midi_file = MidiFile::load(test_file(PITCH_BEND)).unwrap();
     let track = midi_file.tracks().next().unwrap();
 
@@ -226,7 +224,6 @@ fn pitch_bend() {
 
 #[test]
 fn pitch_bend_two_byte() {
-    enable_logging();
     let midi_file = MidiFile::load(test_file(PITCH_BEND_TWO_BYTES)).unwrap();
     let track = midi_file.tracks().nth(1).unwrap();
 

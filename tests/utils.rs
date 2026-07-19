@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use log::LevelFilter;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Once;
 
@@ -18,27 +16,6 @@ pub const PITCH_BEND_TWO_BYTES: &str = "pitch_bend_two_bytes.mid";
 pub const TOBEFREE: &str = "tobefree.mid";
 
 static LOGGER: Once = Once::new();
-
-pub fn enable_logging() {
-    LOGGER.call_once(logger_init)
-}
-
-fn logger_init() {
-    env_logger::Builder::new()
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{}:{} {} [{}] - {}",
-                record.file().unwrap_or("unknown"),
-                record.line().unwrap_or(0),
-                chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.level(),
-                record.args()
-            )
-        })
-        .filter(None, LevelFilter::Warn)
-        .init();
-}
 
 pub fn test_file<S: AsRef<str>>(filename: S) -> PathBuf {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
