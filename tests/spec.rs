@@ -18,6 +18,16 @@ fn file_with_track_data(track_data: &[u8]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/36
+/// Spec 3.1 gives 36 MIDI clocks per dotted quarter in its 6/8 example. A dotted whole is 144
+/// (96 * 1.5).
+#[test]
+fn dotted_clocks_values() {
+    use midi_file::core::Clocks;
+    assert_eq!(Clocks::new(36), Clocks::DottedQuarter);
+    assert_eq!(Clocks::new(144), Clocks::DottedWhole);
+}
+
 /// https://github.com/webern/midi_file/issues/35
 /// A file that ends in the middle of a pitch bend message must error, not panic.
 #[test]
