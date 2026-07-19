@@ -211,8 +211,9 @@ impl MidiFile {
             self.tracks_len() < u32::MAX,
             ctx!(crate::error::ErrorType::Other)
         );
+        // a format 0 file must have exactly one track
         if self.header().format() == Format::Single {
-            ensure!(self.tracks_len() <= 1, ctx!(crate::error::ErrorType::Other));
+            ensure!(self.tracks_len() < 1, ctx!(crate::error::ErrorType::Other));
         }
         self.tracks.push(ensure_end_of_track(track)?);
         Ok(())
@@ -224,8 +225,9 @@ impl MidiFile {
             self.tracks_len() < u32::MAX,
             ctx!(crate::error::ErrorType::Other)
         );
+        // a format 0 file must have exactly one track
         if self.header().format() == Format::Single {
-            ensure!(self.tracks_len() <= 1, ctx!(crate::error::ErrorType::Other));
+            ensure!(self.tracks_len() < 1, ctx!(crate::error::ErrorType::Other));
         }
         ensure!(
             index < self.tracks_len(),

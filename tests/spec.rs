@@ -18,6 +18,19 @@ fn file_with_track_data(track_data: &[u8]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/34
+/// Spec 2.1: ntrks "will always be 1 for a format 0 file."
+#[test]
+fn format_0_rejects_second_track() {
+    use midi_file::file::{Format, Track};
+    use midi_file::Settings;
+    let mut mf = MidiFile::new_with_settings(Settings::new().format(Format::Single));
+    mf.push_track(Track::default()).unwrap();
+    assert!(mf.push_track(Track::default()).is_err());
+    assert!(mf.insert_track(0, Track::default()).is_err());
+    assert_eq!(1, mf.tracks_len());
+}
+
 /// https://github.com/webern/midi_file/issues/36
 /// Spec 3.1 gives 36 MIDI clocks per dotted quarter in its 6/8 example. A dotted whole is 144
 /// (96 * 1.5).
