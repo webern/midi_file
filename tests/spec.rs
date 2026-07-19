@@ -36,6 +36,26 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/9
+/// Spec 3.1: FF 7F len data Sequencer Specific Meta-Event.
+#[test]
+fn sequencer_specific_meta_event() {
+    use midi_file::file::{Event, MetaEvent};
+    let bytes = file_with_track_data(&[
+        0x00, 0xFF, 0x7F, 0x03, 0x43, 0x01, 0x02, // sequencer specific, Yamaha ID
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    let track = mf.tracks().next().unwrap();
+    match track.events().next().unwrap().event() {
+        Event::Meta(MetaEvent::Sequencer(data)) => assert_eq!(&[0x43, 0x01, 0x02], data.as_slice()),
+        e => panic!("wrong event {:?}", e),
+    }
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+}
+
 /// https://github.com/webern/midi_file/issues/8
 /// Spec 3.1: FF 00 02 ssss Sequence Number.
 #[test]

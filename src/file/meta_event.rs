@@ -142,8 +142,9 @@ pub enum MetaEvent {
     /// System Exclusive, manufacturers who define something using this meta-event should publish it so that others may
     /// know how to use it. After all, this is an interchange format. This type of event may be used by a sequencer
     /// which elects to use this as its only file format; sequencers with their established feature-specific formats
-    /// should probably stick to the standard features when using this format.
-    Sequencer, // TODO - value
+    /// should probably stick to the standard features when using this format. The data bytes,
+    /// beginning with the manufacturer ID, are held raw.
+    Sequencer(Vec<u8>),
 
     /// `FF 0x21 0x01 value`: https://mido.readthedocs.io/en/latest/meta_message_types.html
     Port(PortValue),
@@ -187,9 +188,9 @@ impl MetaEvent {
             (META_KEY_SIG, len) if len == LEN_META_KEY_SIG as u32 => {
                 Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?))
             }
-            (META_SEQ_SPECIFIC, _) => {
-                noimpl!("Sequencer-Specific: https://github.com/webern/midi_file/issues/9")
-            }
+            (META_SEQ_SPECIFIC, _) => Ok(MetaEvent::Sequencer(
+                iter.read_n(length as usize).context(io!())?,
+            )),
             (META_PORT, 1) => Ok(MetaEvent::Port(PortValue::new(
                 iter.read_or_die().context(io!())?,
             ))),
@@ -242,8 +243,12 @@ impl MetaEvent {
             MetaEvent::SmpteOffset(value) => value.write(w),
             MetaEvent::TimeSignature(value) => value.write(w),
             MetaEvent::KeySignature(value) => value.write(w),
-            MetaEvent::Sequencer => {
-                noimpl!("Sequencer-Specific: https://github.com/webern/midi_file/issues/9")
+            MetaEvent::Sequencer(data) => {
+                write_u8!(w, META_SEQ_SPECIFIC)?;
+                let length = u32::try_from(data.len())
+                    .context(ctx!(crate::error::ErrorType::StringTooLong))?;
+                w.write_all(&Vlq::new(length).to_bytes()).context(wr!())?;
+                w.write_all(data).context(wr!())
             }
             MetaEvent::Port(value) => {
                 write_u8!(w, META_PORT)?;
