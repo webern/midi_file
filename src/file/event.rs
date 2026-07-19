@@ -38,9 +38,15 @@ impl Event {
         let status_byte = iter.peek_or_die().context(io!())?;
         match status_byte {
             FILE_SYSEX_F7 | FILE_SYSEX_F0 => {
+                // sysex and meta events cancel any running status which was in effect
+                iter.set_latest_message_byte(None);
                 Ok(Event::Sysex(SysexEvent::parse(status_byte, iter)?))
             }
-            FILE_META_EVENT => Ok(Event::Meta(MetaEvent::parse(iter)?)),
+            FILE_META_EVENT => {
+                // sysex and meta events cancel any running status which was in effect
+                iter.set_latest_message_byte(None);
+                Ok(Event::Meta(MetaEvent::parse(iter)?))
+            }
             _ => Ok(Event::Midi(Message::parse(iter)?)),
         }
     }
@@ -48,8 +54,16 @@ impl Event {
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         match self {
             Event::Midi(md) => md.write(w),
-            Event::Sysex(sx) => sx.write(w),
-            Event::Meta(mt) => mt.write(w),
+            Event::Sysex(sx) => {
+                // sysex and meta events cancel any running status which was in effect
+                w.clear_running_status();
+                sx.write(w)
+            }
+            Event::Meta(mt) => {
+                // sysex and meta events cancel any running status which was in effect
+                w.clear_running_status();
+                mt.write(w)
+            }
         }
     }
 }

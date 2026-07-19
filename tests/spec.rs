@@ -36,6 +36,49 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/29
+/// Spec 2.3: "Sysex events and meta events cancel any running status which was in effect."
+#[test]
+fn meta_events_cancel_running_status() {
+    use midi_file::core::{Channel, NoteNumber, Velocity};
+    use midi_file::file::{Format, Track};
+    use midi_file::Settings;
+
+    // write side: the status byte must be repeated after a meta event
+    let settings = Settings::new().running_status(true).format(Format::Single);
+    let mut mf = MidiFile::new_with_settings(settings);
+    let mut track = Track::default();
+    let ch = Channel::new(0);
+    let v = Velocity::new(100);
+    track.push_note_on(0, ch, NoteNumber::new(60), v).unwrap();
+    track.push_note_off(10, ch, NoteNumber::new(60), v).unwrap();
+    track.push_lyric(0, "la").unwrap();
+    track.push_note_off(10, ch, NoteNumber::new(62), v).unwrap();
+    mf.push_track(track).unwrap();
+    let mut bytes: Vec<u8> = Vec::new();
+    mf.write(&mut bytes).unwrap();
+    let expected_track_data: Vec<u8> = vec![
+        0x00, 0x90, 0x3C, 0x64, // note on
+        0x0A, 0x80, 0x3C, 0x64, // note off
+        0x00, 0xFF, 0x05, 0x02, 0x6C, 0x61, // lyric "la"
+        0x0A, 0x80, 0x3E, 0x64, // note off, status byte repeated after the meta event
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ];
+    assert_eq!(
+        &bytes[bytes.len() - expected_track_data.len()..],
+        expected_track_data.as_slice()
+    );
+
+    // read side: running status may not resume across a meta event
+    let bad = file_with_track_data(&[
+        0x00, 0x90, 0x3C, 0x64, // note on
+        0x00, 0xFF, 0x05, 0x02, 0x6C, 0x61, // lyric "la"
+        0x00, 0x3C, 0x00, // data bytes with no status: invalid, running status was canceled
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    assert!(MidiFile::read(bad.as_slice()).is_err());
+}
+
 /// https://github.com/webern/midi_file/issues/30
 /// Spec 2.3: "programs must properly ignore meta-events which they do not recognise, and indeed
 /// should expect to see them." Unknown meta events are retained as raw bytes and roundtrip.

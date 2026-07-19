@@ -65,6 +65,13 @@ impl<W: Write> Scribe<W> {
         }
     }
 
+    /// Forget the previously written status byte. The spec says "Sysex events and meta events
+    /// cancel any running status which was in effect", so the next channel message must write its
+    /// status byte even if it matches the one before the meta or sysex event.
+    pub(crate) fn clear_running_status(&mut self) {
+        self.running_status_byte = None;
+    }
+
     /// Returns true if the settings are set to use `running_status`.
     pub(crate) fn use_running_status(&self) -> bool {
         self.settings.running_status
