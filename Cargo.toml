@@ -1,6 +1,6 @@
 [package]
 name = "midi_file"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Matthew James Briggs <matthew.james.briggs@gmail.com>"]
 edition = "2018"
 exclude = [
@@ -11,7 +11,7 @@ exclude = [
     "examples/",
     "tests/",
 ]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 readme = "README.md"
 description = "For reading and writing MIDI files."
 repository = "https://github.com/webern/midi_file"
@@ -19,10 +19,7 @@ keywords = ["MIDI"]
 categories = ["encoding"]
 
 [dependencies]
-log = "0.4"
-snafu = "0.9"
+# this library does not use dependencies
 
 [dev-dependencies]
-chrono = "0.4"
-env_logger = "0.11"
 tempfile = "3"

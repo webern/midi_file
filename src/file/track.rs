@@ -3,14 +3,12 @@ use crate::core::{
     Channel, Clocks, DurationName, GeneralMidi, Message, NoteMessage, NoteNumber, PitchBendMessage,
     PitchBendValue, Program, ProgramChangeValue, Velocity,
 };
-use crate::error::LibResult;
+use crate::error::{Context, Result};
 use crate::file::{
     Event, MetaEvent, MicrosecondsPerQuarter, QuartersPerMinute, TimeSignatureValue, TrackEvent,
 };
 use crate::scribe::{Scribe, ScribeSettings};
 use crate::Text;
-use log::{debug, trace};
-use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
@@ -49,6 +47,7 @@ impl Track {
     /// Add an event to the end.
     pub fn push_event(&mut self, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32
+        ensure_delta_time(delta_time)?;
         self.events.push(TrackEvent::new(delta_time, event));
         Ok(())
     }
@@ -56,6 +55,7 @@ impl Track {
     /// Add event at `index` and shift everything after it.
     pub fn insert_event(&mut self, index: u32, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
+        ensure_delta_time(delta_time)?;
         self.events
             .insert(index as usize, TrackEvent::new(delta_time, event));
         Ok(())
@@ -70,6 +70,7 @@ impl Track {
     ) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
         // std::mem::replace(&mut , TrackEvent{delta_time, event})
+        ensure_delta_time(delta_time)?;
         self.events[index as usize] = TrackEvent::new(delta_time, event);
         Ok(())
     }
@@ -86,8 +87,7 @@ impl Track {
             if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Meta(MetaEvent::TrackName(s)) = event.event() {
-                debug!("changing track name from '{}' to '{}'", s, name);
+            if let Event::Meta(MetaEvent::TrackName(_)) = event.event() {
                 self.replace_event(ix as u32, 0, meta)?;
                 return Ok(());
             }
@@ -108,8 +108,7 @@ impl Track {
             if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Meta(MetaEvent::InstrumentName(s)) = event.event() {
-                debug!("changing instrument name from '{}' to '{}'", s, name);
+            if let Event::Meta(MetaEvent::InstrumentName(_)) = event.event() {
                 self.replace_event(ix as u32, 0, meta)?;
                 return Ok(());
             }
@@ -132,12 +131,7 @@ impl Track {
             if event.delta_time() != 0 {
                 break;
             }
-            if let Event::Midi(Message::ProgramChange(prog)) = event.event() {
-                debug!(
-                    "changing program from '{}' to '{:?}'",
-                    prog.program.get(),
-                    value
-                );
+            if let Event::Midi(Message::ProgramChange(_)) = event.event() {
                 self.replace_event(ix as u32, 0, program_change)?;
                 return Ok(());
             }
@@ -228,8 +222,9 @@ impl Track {
         Ok(())
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        iter.expect_tag("MTrk").context(io!())?;
+    /// Parse a track chunk. The caller has already consumed the `MTrk` tag; parsing starts at the
+    /// chunk length.
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         let chunk_length = iter.read_u32().context(io!())?;
         iter.set_size_limit(chunk_length as u64);
         let mut events = Vec::new();
@@ -238,11 +233,9 @@ impl Track {
                 invalid_file!("end of track bytes reached before EndOfTrack event.");
             }
             let event = TrackEvent::parse(iter)?;
-            trace!("parsed {:?}", event);
             let is_track_end = event.is_end();
             events.push(event);
             if is_track_end {
-                debug!("end of track event");
                 if !iter.is_end() {
                     invalid_file!("EndOfTrack event before end of track bytes.");
                 }
@@ -253,7 +246,7 @@ impl Track {
         Ok(Self { events })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         // write the track chunk header
         w.write_all(b"MTrk").context(wr!())?;
 
@@ -270,8 +263,8 @@ impl Track {
         }
 
         // write the length of the track
-        let track_length = u32::try_from(track_data.len())
-            .context(crate::error::TrackTooLongSnafu { site: site!() })?;
+        let track_length =
+            u32::try_from(track_data.len()).context(ctx!(crate::error::ErrorType::TrackTooLong))?;
         w.write_all(&track_length.to_be_bytes()).context(wr!())?;
 
         // write the track data
@@ -280,9 +273,18 @@ impl Track {
     }
 }
 
+/// The spec caps a delta time at the largest four-byte variable-length quantity, 0x0FFFFFFF.
+fn ensure_delta_time(delta_time: u32) -> Result<()> {
+    ensure!(
+        delta_time <= crate::core::vlq::MAX_VLQ,
+        ctx!(crate::error::ErrorType::VlqTooBig)
+    );
+    Ok(())
+}
+
 /// If the last item of the track is *not* an end-of-track event, then add it to the back. If
 /// the track already has an end-of-track event as its last event, then nothing happens.
-pub(crate) fn ensure_end_of_track(mut track: Track) -> LibResult<Track> {
+pub(crate) fn ensure_end_of_track(mut track: Track) -> Result<Track> {
     if let Some(last_event) = track.events.last() {
         if !matches!(last_event.event(), Event::Meta(MetaEvent::EndOfTrack)) {
             track.push_event(0, Event::Meta(MetaEvent::EndOfTrack))?;

@@ -9,8 +9,8 @@ A library for reading, writing and creating MIDI files.
 #![deny(clippy::complexity)]
 #![deny(clippy::perf)]
 #![deny(clippy::style)]
-#![warn(rustdoc::missing_crate_level_docs)]
-#![warn(missing_docs)]
+#![deny(rustdoc::missing_crate_level_docs)]
+#![deny(missing_docs)]
 #![deny(nonstandard_style)]
 #![deny(rust_2018_idioms)]
 #![deny(unreachable_patterns)]
@@ -33,13 +33,11 @@ pub mod file;
 mod scribe;
 mod text;
 
-use crate::error::LibResult;
+use crate::error::Context;
 use crate::file::{ensure_end_of_track, Division, Format, Header, Track};
 use crate::scribe::{Scribe, ScribeSettings};
 pub use crate::text::Text;
-pub use error::{Error, Result};
-use log::trace;
-use snafu::{ensure, ResultExt};
+pub use error::{Error, ErrorType, Result};
 use std::fs::File;
 
 /// Optionally provide settings to the [`MidiFile`]. This is a 'builder' struct.
@@ -145,18 +143,18 @@ impl MidiFile {
     pub fn read<R: Read>(r: R) -> Result<Self> {
         let bytes = std::io::BufReader::new(r).bytes();
         let iter = ByteIter::new(bytes).context(io!())?;
-        Ok(Self::read_inner(iter)?)
+        Self::read_inner(iter)
     }
 
     /// Load a `MidiFile` from a file path.
     pub fn load<P: AsRef<Path>>(file: P) -> Result<Self> {
-        Ok(Self::read_inner(ByteIter::new_file(file).context(io!())?)?)
+        Self::read_inner(ByteIter::new_file(file).context(io!())?)
     }
 
     /// Write a `MidiFile` to bytes.
     pub fn write<W: Write>(&self, w: &mut W) -> Result<()> {
         let ntracks = u16::try_from(self.tracks.len())
-            .context(error::TooManyTracksSnafu { site: site!() })?;
+            .context(ctx!(crate::error::ErrorType::TooManyTracks))?;
         let mut scribe = Scribe::new(
             w,
             ScribeSettings {
@@ -173,10 +171,11 @@ impl MidiFile {
     /// Save a `MidiFile` to a file path.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path = path.as_ref();
-        let file = File::create(path).context(error::CreateSnafu {
-            site: site!(),
-            path,
-        })?;
+        let file = File::create(path).context(ctx!(
+            error::ErrorType::FileCreate,
+            "unable to create '{}'",
+            path.display()
+        ))?;
         let w = BufWriter::new(file);
         let mut scribe = Scribe::new(
             w,
@@ -210,10 +209,11 @@ impl MidiFile {
     pub fn push_track(&mut self, track: Track) -> Result<()> {
         ensure!(
             self.tracks_len() < u32::MAX,
-            error::OtherSnafu { site: site!() }
+            ctx!(crate::error::ErrorType::Other)
         );
+        // a format 0 file must have exactly one track
         if self.header().format() == Format::Single {
-            ensure!(self.tracks_len() <= 1, error::OtherSnafu { site: site!() });
+            ensure!(self.tracks_len() < 1, ctx!(crate::error::ErrorType::Other));
         }
         self.tracks.push(ensure_end_of_track(track)?);
         Ok(())
@@ -223,17 +223,18 @@ impl MidiFile {
     pub fn insert_track(&mut self, index: u32, track: Track) -> Result<()> {
         ensure!(
             self.tracks_len() < u32::MAX,
-            error::OtherSnafu { site: site!() }
+            ctx!(crate::error::ErrorType::Other)
         );
+        // a format 0 file must have exactly one track
         if self.header().format() == Format::Single {
-            ensure!(self.tracks_len() <= 1, error::OtherSnafu { site: site!() });
+            ensure!(self.tracks_len() < 1, ctx!(crate::error::ErrorType::Other));
         }
         ensure!(
             index < self.tracks_len(),
-            error::OtherSnafu { site: site!() }
+            ctx!(crate::error::ErrorType::Other)
         );
         self.tracks.insert(
-            usize::try_from(index).context(error::TooManyTracksSnafu { site: site!() })?,
+            usize::try_from(index).context(ctx!(crate::error::ErrorType::TooManyTracks))?,
             ensure_end_of_track(track)?,
         );
         Ok(())
@@ -243,29 +244,40 @@ impl MidiFile {
     pub fn remove_track(&mut self, index: u32) -> Result<Track> {
         ensure!(
             index < self.tracks_len(),
-            error::OtherSnafu { site: site!() }
+            ctx!(crate::error::ErrorType::Other)
         );
-        let i = usize::try_from(index).context(error::TooManyTracksSnafu { site: site!() })?;
+        let i = usize::try_from(index).context(ctx!(crate::error::ErrorType::TooManyTracks))?;
         Ok(self.tracks.remove(i))
     }
 
-    fn read_inner<R: Read>(mut iter: ByteIter<R>) -> LibResult<Self> {
-        trace!("parsing header chunk");
+    fn read_inner<R: Read>(mut iter: ByteIter<R>) -> Result<Self> {
         iter.expect_tag("MThd").context(io!())?;
         let chunk_length = iter.read_u32().context(io!())?;
-        // header chunk length is always 6
-        if chunk_length != 6 {
-            return error::OtherSnafu { site: site!() }.fail();
+        // the header data is three 16-bit words. the spec allows the chunk to be longer ("it is
+        // important to read and honour the length, even if it is longer than 6") but never shorter.
+        if chunk_length < 6 {
+            invalid_file!("header chunk length {} is less than 6", chunk_length);
         }
         let format_word = iter.read_u16().context(io!())?;
         let num_tracks = iter.read_u16().context(io!())?;
         let division_data = iter.read_u16().context(io!())?;
+        // ignore any header data beyond the six bytes we know about
+        iter.skip_n((chunk_length - 6) as usize).context(io!())?;
         let format = Format::from_u16(format_word)?;
         let header = Header::new(format, Division::from_u16(division_data)?);
         let mut tracks = Vec::new();
-        for i in 0..num_tracks {
-            trace!("parsing track chunk {} (zero-based) of {}", i, num_tracks);
-            tracks.push(Track::parse(&mut iter)?)
+        for _ in 0..num_tracks {
+            // the spec says programs should expect alien chunks and "treat them as if they weren't
+            // there", so skip any chunk that is not an MTrk.
+            loop {
+                let tag = iter.read4().context(io!())?;
+                if &tag == b"MTrk" {
+                    tracks.push(Track::parse(&mut iter)?);
+                    break;
+                }
+                let chunk_length = iter.read_u32().context(io!())?;
+                iter.skip_n(chunk_length as usize).context(io!())?;
+            }
         }
         Ok(Self {
             running_status: iter.is_running_status_detected(),

@@ -1,18 +1,16 @@
 use crate::byte_iter::ByteIter;
 use crate::core::bits::{decode_14_bit_number, encode_14_bit_number};
 use crate::core::{
-    Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, Program, StatusType,
-    Velocity,
+    Channel, ControlValue, MonoModeChannels, NoteNumber, PitchBendValue, PressureValue, Program,
+    QuarterFrameValue, SongNumber, SongPosition, StatusType, Velocity,
 };
-use crate::error::{self, LibResult};
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
-use log::{trace, warn};
-use snafu::{OptionExt, ResultExt};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 pub(crate) trait WriteBytes {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()>;
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()>;
 }
 
 /// Represents the data that is common, and required for both [`Message::NoteOn`] and
@@ -49,7 +47,7 @@ impl NoteMessage {
         self.velocity
     }
 
-    fn parse<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Self> {
+    fn parse<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> Result<Self> {
         Ok(NoteMessage {
             channel,
             note_number: iter.read_or_die().context(io!())?.into(),
@@ -57,7 +55,7 @@ impl NoteMessage {
         })
     }
 
-    fn write<W: Write>(&self, w: &mut Scribe<W>, st: StatusType) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>, st: StatusType) -> Result<()> {
         write_status_byte(w, st, self.channel)?;
         w.write_all(&self.note_number.get().to_be_bytes())
             .context(wr!())?;
@@ -93,17 +91,53 @@ impl ProgramChangeValue {
 }
 
 impl WriteBytes for ProgramChangeValue {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_status_byte(w, StatusType::Program, self.channel)?;
         write_u8!(w, self.program.get())?;
         Ok(())
     }
 }
 
-// TODO - unused?
-/// Maybe unused.
+/// Channel Pressure (After-touch), status `0xD`. This message is most often sent by pressing down
+/// on the key after it "bottoms out". Unlike polyphonic after-touch it carries the single greatest
+/// pressure value of all the currently depressed keys.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ChannelPressureMessage {}
+pub struct ChannelPressureMessage {
+    pub(crate) channel: Channel,
+    pub(crate) pressure: PressureValue,
+}
+
+impl ChannelPressureMessage {
+    /// Create a new `ChannelPressureMessage`.
+    pub fn new(channel: Channel, pressure: PressureValue) -> Self {
+        Self { channel, pressure }
+    }
+
+    /// Getter for the `channel` field.
+    pub fn channel(&self) -> Channel {
+        self.channel
+    }
+
+    /// Getter for the `pressure` field.
+    pub fn pressure(&self) -> PressureValue {
+        self.pressure
+    }
+
+    fn parse<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> Result<Self> {
+        Ok(Self {
+            channel,
+            pressure: iter.read_or_die().context(io!())?.into(),
+        })
+    }
+}
+
+impl WriteBytes for ChannelPressureMessage {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        write_status_byte(w, StatusType::ChannelPressure, self.channel)?;
+        write_u8!(w, self.pressure.get())?;
+        Ok(())
+    }
+}
 
 /// Provides the ability to pitch bend a channel by specifying a pitch bend value between
 /// 0 and 16383 where 8192 (the middle) is no pitch bend. Above 8192 bends the note up and
@@ -136,7 +170,7 @@ impl PitchBendMessage {
 }
 
 impl WriteBytes for PitchBendMessage {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_status_byte(w, StatusType::PitchBend, self.channel)?;
         let decoded = self.pitch_bend.get();
         let encoded = encode_14_bit_number(decoded);
@@ -144,21 +178,6 @@ impl WriteBytes for PitchBendMessage {
         write_u8!(w, ((encoded & 0b0000000011111111) as u8))?;
         Ok(())
     }
-}
-
-/// Some complicated MIDI thing.
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[allow(dead_code)]
-pub enum ModeMessage {
-    AllSoundsOff(Channel),
-    ResetAllControllers(Channel),
-    LocalControl(LocalControlValue),
-    AllNotesOff(Channel),
-    OmniModeOff(Channel),
-    OmniModeOn(Channel),
-    MonoModeOn(MonoModeOnValue),
-    PolyModeOn,
 }
 
 /// Represents an on/off state for MIDI messages such as Local Control.
@@ -188,12 +207,6 @@ pub enum OnOff {
 pub struct LocalControlValue {
     channel: Channel,
     on_off: OnOff,
-}
-
-impl Default for ModeMessage {
-    fn default() -> Self {
-        ModeMessage::AllSoundsOff(Channel::new(0))
-    }
 }
 
 impl LocalControlValue {
@@ -241,61 +254,98 @@ impl MonoModeOnValue {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[allow(dead_code)]
-pub enum SystemCommonMessage {
-    MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage),
-    SongPositionPointer(SongPositionPointerMessage),
-    SongSelect(SongSelectMessage),
-    TuneRequest,
-    EndOfSysexFlag,
+/// MIDI Time Code Quarter Frame, status `0xF1`. Carries one data byte holding a 3-bit message
+/// type and a 4-bit value, packed as `0nnndddd`.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct MidiTimeCodeQuarterFrameMessage {
+    pub(crate) value: QuarterFrameValue,
 }
 
-impl Default for SystemCommonMessage {
-    fn default() -> Self {
-        SystemCommonMessage::MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage::default())
+impl MidiTimeCodeQuarterFrameMessage {
+    /// Create a new `MidiTimeCodeQuarterFrameMessage`.
+    pub fn new(value: QuarterFrameValue) -> Self {
+        Self { value }
+    }
+
+    /// Getter for the `value` field.
+    pub fn value(&self) -> QuarterFrameValue {
+        self.value
+    }
+
+    fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
+        Ok(Self {
+            value: iter.read_or_die().context(io!())?.into(),
+        })
+    }
+
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        write_u8!(w, STATUS_MTC_QUARTER_FRAME)?;
+        write_u8!(w, self.value.get())?;
+        Ok(())
     }
 }
 
+/// Song Position Pointer, status `0xF2`. A 14-bit register holding the number of MIDI beats
+/// (1 beat = six MIDI clocks) since the start of the song, transmitted LSB first.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct MidiTimeCodeQuarterFrameMessage {}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct SongPositionPointerMessage {}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct SongSelectMessage {}
-
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
-pub enum SystemRealtimeMessage {
-    #[default]
-    TimingClock = 0xf8,
-    Undefined1 = 0xf9,
-    Start = 0xfa,
-    Continue = 0xfb,
-    Stop = 0xfc,
-    Undefined2 = 0xfd,
-    ActiveSensing = 0xfe,
-    SystemReset = 0xff,
+pub struct SongPositionPointerMessage {
+    pub(crate) position: SongPosition,
 }
 
-/// MIDI System Messages are classified as being System Common Messages, System Real Time Messages,
-/// or System Exclusive Messages. System Common messages are intended for all receivers in the
-/// system. System Real Time messages are used for synchronization between clock-based MIDI
-/// components. System Exclusive messages include a Manufacturer's Identification (ID) code, and are
-/// used to transfer any number of data bytes in a format specified by the referenced manufacturer.
-// TODO - add system exclusive messages (sysex)
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[allow(dead_code)]
-pub enum SystemMessage {
-    Common(SystemCommonMessage),
-    Realtime(SystemRealtimeMessage),
+impl SongPositionPointerMessage {
+    /// Create a new `SongPositionPointerMessage`.
+    pub fn new(position: SongPosition) -> Self {
+        Self { position }
+    }
+
+    /// Getter for the `position` field.
+    pub fn position(&self) -> SongPosition {
+        self.position
+    }
+
+    fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
+        let value = iter.read_u16().context(io!())?;
+        Ok(Self {
+            position: SongPosition::new(decode_14_bit_number(value)),
+        })
+    }
+
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        write_u8!(w, STATUS_SONG_POSITION)?;
+        let encoded = encode_14_bit_number(self.position.get());
+        write_u8!(w, ((encoded >> 8) as u8))?;
+        write_u8!(w, ((encoded & 0b0000000011111111) as u8))?;
+        Ok(())
+    }
 }
 
-impl Default for SystemMessage {
-    fn default() -> Self {
-        SystemMessage::Common(SystemCommonMessage::default())
+/// Song Select, status `0xF3`. Specifies which sequence or song is to be played.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SongSelectMessage {
+    pub(crate) song: SongNumber,
+}
+
+impl SongSelectMessage {
+    /// Create a new `SongSelectMessage`.
+    pub fn new(song: SongNumber) -> Self {
+        Self { song }
+    }
+
+    /// Getter for the `song` field.
+    pub fn song(&self) -> SongNumber {
+        self.song
+    }
+
+    fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
+        Ok(Self {
+            song: iter.read_or_die().context(io!())?.into(),
+        })
+    }
+
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        write_u8!(w, STATUS_SONG_SELECT)?;
+        write_u8!(w, self.song.get())?;
+        Ok(())
     }
 }
 
@@ -306,37 +356,61 @@ impl Default for SystemMessage {
 /// byte for these messages. System messages are not Channel specific, and no Channel number is
 /// indicated in their status bytes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[allow(missing_docs)]
 pub enum Message {
+    /// `0x8`: sent when a note is released.
     NoteOff(NoteMessage),
+    /// `0x9`: sent when a note is depressed. A velocity of 0 acts as a note off.
     NoteOn(NoteMessage),
+    /// `0xA`: polyphonic key pressure (aftertouch) for an individual key.
     PolyPressure(NoteMessage),
+    /// `0xB` with a controller number 0-119: a control change.
     Control(ControlChangeValue),
+    /// `0xC`: changes the patch (instrument sound) on a channel.
     ProgramChange(ProgramChangeValue),
+    /// `0xD`: channel pressure (aftertouch), the greatest pressure of all depressed keys.
     ChannelPressure(ChannelPressureMessage),
+    /// `0xE`: a change in the pitch wheel, measured by a fourteen-bit value.
     PitchBend(PitchBendMessage),
+    /// `0xB` controller 120: turns all sound on the channel off.
     AllSoundsOff(Channel),
+    /// `0xB` controller 121: resets all controllers on the channel.
     ResetAllControllers(Channel),
+    /// `0xB` controller 122, value 0: the keyboard responds only to received MIDI data.
     LocalControlOff(Channel),
+    /// `0xB` controller 122, value 127: restores the normal keyboard-to-sound connection.
     LocalControlOn(Channel),
+    /// `0xB` controller 123: turns all notes on the channel off.
     AllNotesOff(Channel),
+    /// `0xB` controller 124: omni mode off (also causes all notes off).
     OmniModeOff(Channel),
+    /// `0xB` controller 125: omni mode on (also causes all notes off).
     OmniModeOn(Channel),
+    /// `0xB` controller 126: mono mode on, i.e. poly mode off (also causes all notes off).
     MonoModeOn(MonoModeOnValue),
+    /// `0xB` controller 127: poly mode on, i.e. mono mode off (also causes all notes off).
     PolyModeOn(Channel),
+    /// `0xF1`: a MIDI time code quarter frame.
     MidiTimeCodeQuarterFrame(MidiTimeCodeQuarterFrameMessage),
+    /// `0xF2`: the number of MIDI beats since the start of the song.
     SongPositionPointer(SongPositionPointerMessage),
+    /// `0xF3`: specifies which sequence or song is to be played.
     SongSelect(SongSelectMessage),
+    /// `0xF6`: upon receiving this, all analog synthesizers should tune their oscillators.
     TuneRequest,
-    EndOfSysexFlag,
+    /// `0xF8`: sent 24 times per quarter note when synchronization is required.
     TimingClock,
+    /// `0xF9`: an undefined system realtime status byte.
     Undefined1,
+    /// `0xFA`: start the current sequence playing.
     Start,
+    /// `0xFB`: continue at the point the sequence was stopped.
     Continue,
+    /// `0xFC`: stop the current sequence.
     Stop,
+    /// `0xFD`: an undefined system realtime status byte.
     Undefined2,
+    /// `0xFE`: sent every 300ms (max) when the connection should be presumed alive.
     ActiveSensing,
-    SystemReset,
 }
 
 impl Default for Message {
@@ -346,38 +420,63 @@ impl Default for Message {
 }
 
 impl Message {
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         // check if the first byte is a status byte. if not, then this should be a running status
         // message.
         let byte = if matches!(iter.peek_or_die().context(io!())?, 0x00..=0x7F) {
             iter.set_running_status_detected();
-            let running_status = iter
-                .latest_message_byte()
-                .context(error::RunningStatusSnafu { site: site!() })?;
-            trace!("running status byte {:#x}", running_status);
-            running_status
+            iter.latest_message_byte()
+                .context(ctx!(crate::error::ErrorType::RunningStatus))?
         } else {
-            let byte = iter.read_or_die().context(io!())?;
-            iter.set_latest_message_byte(Some(byte));
-            byte
+            iter.read_or_die().context(io!())?
         };
 
-        // first check if the message is a sysex or realtime message (using the whole byte).
+        // system realtime messages: single-byte messages that do not affect running status.
+        // 0xff cannot be reached here because it introduces a meta event in a MIDI file and is
+        // dispatched by Event::parse.
         match byte {
-            x if SystemRealtimeMessage::TimingClock as u8 == x => return Ok(Message::TimingClock),
-            x if SystemRealtimeMessage::Undefined1 as u8 == x => return Ok(Message::Undefined1),
-            x if SystemRealtimeMessage::Start as u8 == x => return Ok(Message::Start),
-            x if SystemRealtimeMessage::Continue as u8 == x => return Ok(Message::Continue),
-            x if SystemRealtimeMessage::Stop as u8 == x => return Ok(Message::Stop),
-            x if SystemRealtimeMessage::Undefined2 as u8 == x => return Ok(Message::Undefined2),
-            x if SystemRealtimeMessage::ActiveSensing as u8 == x => {
-                return Ok(Message::ActiveSensing)
-            }
-            x if SystemRealtimeMessage::SystemReset as u8 == x => return Ok(Message::SystemReset),
-            0xf0 => noimpl!("sysex: https://github.com/webern/midi_file/issues/7"),
+            STATUS_TIMING_CLOCK => return Ok(Message::TimingClock),
+            STATUS_UNDEFINED_1 => return Ok(Message::Undefined1),
+            STATUS_START => return Ok(Message::Start),
+            STATUS_CONTINUE => return Ok(Message::Continue),
+            STATUS_STOP => return Ok(Message::Stop),
+            STATUS_UNDEFINED_2 => return Ok(Message::Undefined2),
+            STATUS_ACTIVE_SENSING => return Ok(Message::ActiveSensing),
             _ => {}
         }
-        // now check if it is a channel voice message or channel mode message
+
+        // system common messages cancel running status. 0xf0 and 0xf7 are sysex events dispatched
+        // by Event::parse; 0xf4 and 0xf5 are undefined and their data lengths are unknown, so they
+        // cannot be parsed past.
+        match byte {
+            STATUS_MTC_QUARTER_FRAME => {
+                iter.set_latest_message_byte(None);
+                return Ok(Message::MidiTimeCodeQuarterFrame(
+                    MidiTimeCodeQuarterFrameMessage::parse(iter)?,
+                ));
+            }
+            STATUS_SONG_POSITION => {
+                iter.set_latest_message_byte(None);
+                return Ok(Message::SongPositionPointer(
+                    SongPositionPointerMessage::parse(iter)?,
+                ));
+            }
+            STATUS_SONG_SELECT => {
+                iter.set_latest_message_byte(None);
+                return Ok(Message::SongSelect(SongSelectMessage::parse(iter)?));
+            }
+            STATUS_TUNE_REQUEST => {
+                iter.set_latest_message_byte(None);
+                return Ok(Message::TuneRequest);
+            }
+            0xf0 | 0xf4 | 0xf5 | 0xf7 => {
+                invalid_file!("unexpected status byte {:#04X}", byte)
+            }
+            _ => {}
+        }
+
+        // a channel voice or channel mode message: participates in running status.
+        iter.set_latest_message_byte(Some(byte));
         let (status_type, channel) = split_byte(byte)?;
         match status_type {
             StatusType::NoteOff => Ok(Message::NoteOff(NoteMessage::parse(iter, channel)?)),
@@ -393,31 +492,30 @@ impl Message {
                     program,
                 }))
             }
-            StatusType::ChannelPressure => {
-                noimpl!("channel pressure: https://github.com/webern/midi_file/issues/X")
-            }
+            StatusType::ChannelPressure => Ok(Message::ChannelPressure(
+                ChannelPressureMessage::parse(iter, channel)?,
+            )),
             StatusType::PitchBend => {
-                let value = iter.read_u16().unwrap();
+                let value = iter.read_u16().context(io!())?;
                 let decoded = decode_14_bit_number(value);
                 Ok(Message::PitchBend(PitchBendMessage {
                     channel,
                     pitch_bend: PitchBendValue::new(decoded),
                 }))
             }
-            StatusType::System => noimpl!("system: https://github.com/webern/midi_file/issues/10"),
+            // every 0xF status byte was handled above
+            StatusType::System => invalid_file!("unexpected status byte {:#04X}", byte),
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         match self {
             Message::NoteOff(value) => value.write(w, StatusType::NoteOff),
             Message::NoteOn(value) => value.write(w, StatusType::NoteOn),
             Message::PolyPressure(value) => value.write(w, StatusType::PolyPressure),
             Message::Control(value) => value.write(w),
             Message::ProgramChange(value) => value.write(w),
-            Message::ChannelPressure(_) => {
-                noimpl!("ChannelPressure: https://github.com/webern/midi_file/issues/X")
-            }
+            Message::ChannelPressure(value) => value.write(w),
             Message::PitchBend(value) => value.write(w),
             Message::AllSoundsOff(channel) => write_chanmod(w, *channel, CONTROL_ALL_SOUNDS_OFF, 0),
             Message::ResetAllControllers(channel) => {
@@ -439,40 +537,49 @@ impl Message {
                 m.mono_mode_channels.get(),
             ),
             Message::PolyModeOn(channel) => write_chanmod(w, *channel, CONTROL_POLY_MODE_ON, 0),
-            Message::MidiTimeCodeQuarterFrame(_) => {
-                noimpl!("MidiTimeCodeQuarterFrame: https://github.com/webern/midi_file/issues/10")
+            // system common messages cancel running status
+            Message::MidiTimeCodeQuarterFrame(value) => {
+                w.clear_running_status();
+                value.write(w)
             }
-            Message::SongPositionPointer(_) => {
-                noimpl!("SongPositionPointer: https://github.com/webern/midi_file/issues/10")
+            Message::SongPositionPointer(value) => {
+                w.clear_running_status();
+                value.write(w)
             }
-            Message::SongSelect(_) => {
-                noimpl!("SongSelect: https://github.com/webern/midi_file/issues/10")
+            Message::SongSelect(value) => {
+                w.clear_running_status();
+                value.write(w)
             }
             Message::TuneRequest => {
-                noimpl!("TuneRequest: https://github.com/webern/midi_file/issues/10")
+                w.clear_running_status();
+                write_u8!(w, STATUS_TUNE_REQUEST)
             }
-            Message::EndOfSysexFlag => {
-                noimpl!("EndOfSysexFlag: https://github.com/webern/midi_file/issues/10")
-            }
-            Message::TimingClock => {
-                noimpl!("TimingClock: https://github.com/webern/midi_file/issues/10")
-            }
-            Message::Undefined1 => {
-                noimpl!("Undefined1: https://github.com/webern/midi_file/issues/10")
-            }
-            Message::Start => noimpl!("Start: https://github.com/webern/midi_file/issues/10"),
-            Message::Continue => noimpl!("Continue: https://github.com/webern/midi_file/issues/10"),
-            Message::Stop => noimpl!("Stop: https://github.com/webern/midi_file/issues/10"),
-            Message::Undefined2 => noimpl!(""),
-            Message::ActiveSensing => {
-                noimpl!("ActiveSensing: https://github.com/webern/midi_file/issues/10")
-            }
-            Message::SystemReset => {
-                noimpl!("SystemReset: https://github.com/webern/midi_file/issues/10")
-            }
+            // system realtime messages are a single byte and do not affect running status
+            Message::TimingClock => write_u8!(w, STATUS_TIMING_CLOCK),
+            Message::Undefined1 => write_u8!(w, STATUS_UNDEFINED_1),
+            Message::Start => write_u8!(w, STATUS_START),
+            Message::Continue => write_u8!(w, STATUS_CONTINUE),
+            Message::Stop => write_u8!(w, STATUS_STOP),
+            Message::Undefined2 => write_u8!(w, STATUS_UNDEFINED_2),
+            Message::ActiveSensing => write_u8!(w, STATUS_ACTIVE_SENSING),
         }
     }
 }
+
+// system common status bytes
+pub(crate) const STATUS_MTC_QUARTER_FRAME: u8 = 0xf1;
+pub(crate) const STATUS_SONG_POSITION: u8 = 0xf2;
+pub(crate) const STATUS_SONG_SELECT: u8 = 0xf3;
+pub(crate) const STATUS_TUNE_REQUEST: u8 = 0xf6;
+
+// system realtime status bytes
+pub(crate) const STATUS_TIMING_CLOCK: u8 = 0xf8;
+pub(crate) const STATUS_UNDEFINED_1: u8 = 0xf9;
+pub(crate) const STATUS_START: u8 = 0xfa;
+pub(crate) const STATUS_CONTINUE: u8 = 0xfb;
+pub(crate) const STATUS_STOP: u8 = 0xfc;
+pub(crate) const STATUS_UNDEFINED_2: u8 = 0xfd;
+pub(crate) const STATUS_ACTIVE_SENSING: u8 = 0xfe;
 
 pub(crate) const CONTROL_ALL_SOUNDS_OFF: u8 = 120;
 pub(crate) const CONTROL_RESET_ALL_CONTROLLERS: u8 = 121;
@@ -484,7 +591,7 @@ pub(crate) const CONTROL_MONO_MODE_ON: u8 = 126;
 pub(crate) const CONTROL_POLY_MODE_ON: u8 = 127;
 
 /// Returns (4-bit status part, 4-bit channel).
-fn split_byte(status_byte: u8) -> LibResult<(StatusType, Channel)> {
+fn split_byte(status_byte: u8) -> Result<(StatusType, Channel)> {
     let status_type_val = status_byte >> 4;
     let status_type = StatusType::from_u8(status_type_val)?;
     let channel_value = status_byte & 0b0000_1111;
@@ -505,12 +612,12 @@ fn write_status_byte<W: Write>(
     w: &mut Scribe<W>,
     status: StatusType,
     channel: Channel,
-) -> LibResult<()> {
+) -> Result<()> {
     let data = merge_byte(status, channel);
     w.write_status_byte(data)
 }
 
-fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Message> {
+fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> Result<Message> {
     let first_data_byte = iter.read_or_die().context(io!())?;
     match first_data_byte {
         0..=119 => parse_control(iter, channel, first_data_byte),
@@ -519,7 +626,7 @@ fn parse_0xb<R: Read>(iter: &mut ByteIter<R>, channel: Channel) -> LibResult<Mes
     }
 }
 
-fn parse_chanmod<R>(it: &mut ByteIter<R>, chan: Channel, first_byte: u8) -> LibResult<Message>
+fn parse_chanmod<R>(it: &mut ByteIter<R>, chan: Channel, first_byte: u8) -> Result<Message>
 where
     R: Read,
 {
@@ -528,15 +635,10 @@ where
         CONTROL_ALL_SOUNDS_OFF => Ok(Message::AllSoundsOff(chan)),
         CONTROL_RESET_ALL_CONTROLLERS => Ok(Message::ResetAllControllers(chan)),
         CONTROL_LOCAL_CONTROL => {
+            // The spec says 127 for "on", but anything nonzero is treated as "on".
             if second_byte == 0 {
                 Ok(Message::LocalControlOff(chan))
             } else {
-                if second_byte != 127 {
-                    warn!(
-                        "unexpected local control on value, {}, setting to 127",
-                        second_byte
-                    )
-                }
                 Ok(Message::LocalControlOn(chan))
             }
         }
@@ -552,7 +654,7 @@ where
     }
 }
 
-fn write_chanmod<W>(w: &mut Scribe<W>, channel: Channel, controller: u8, value: u8) -> LibResult<()>
+fn write_chanmod<W>(w: &mut Scribe<W>, channel: Channel, controller: u8, value: u8) -> Result<()>
 where
     W: Write,
 {
@@ -565,7 +667,7 @@ where
     Ok(())
 }
 
-fn parse_control<R>(it: &mut ByteIter<R>, chan: Channel, first_data_byte: u8) -> LibResult<Message>
+fn parse_control<R>(it: &mut ByteIter<R>, chan: Channel, first_data_byte: u8) -> Result<Message>
 where
     R: Read,
 {
@@ -713,7 +815,7 @@ pub enum Control {
 }
 
 impl Control {
-    pub(crate) fn try_from_u8(value: u8) -> LibResult<Self> {
+    pub(crate) fn try_from_u8(value: u8) -> Result<Self> {
         match value {
             x if x == Control::BankSelect as u8 => Ok(Control::BankSelect),
             x if x == Control::ModWheel as u8 => Ok(Control::ModWheel),
@@ -845,7 +947,7 @@ impl Control {
             x if x == Control::Undefined117 as u8 => Ok(Control::Undefined117),
             x if x == Control::Undefined118 as u8 => Ok(Control::Undefined118),
             x if x == Control::Undefined119 as u8 => Ok(Control::Undefined119),
-            _ => error::OtherSnafu { site: site!() }.fail(),
+            _ => ctx!(crate::error::ErrorType::Other)().fail(),
         }
     }
 }
@@ -853,8 +955,8 @@ impl Control {
 impl TryFrom<u8> for Control {
     type Error = crate::Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(Self::try_from_u8(value)?)
+    fn try_from(value: u8) -> crate::Result<Self> {
+        Self::try_from_u8(value)
     }
 }
 
@@ -894,7 +996,7 @@ impl ControlChangeValue {
 }
 
 impl WriteBytes for ControlChangeValue {
-    fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_status_byte(w, StatusType::ControlOrSelectChannelMode, self.channel)?;
         write_u8!(w, self.control as u8)?;
         write_u8!(w, self.value.get())?;

@@ -3,7 +3,7 @@
 /// the frequency of the metronome click.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum Clocks {
-    /// 142 MIDI clocks.
+    /// 144 MIDI clocks.
     DottedWhole,
 
     /// 96 MIDI clocks.
@@ -15,7 +15,7 @@ pub enum Clocks {
     /// 48 MIDI clocks.
     Half,
 
-    /// 32 MIDI clocks.
+    /// 36 MIDI clocks.
     DottedQuarter,
 
     /// 24 MIDI clocks.
@@ -43,11 +43,11 @@ impl Clocks {
     /// falling back to `Other` if the value does not correspond to one of the named variants.
     pub(crate) fn from_u8(v: u8) -> Clocks {
         match v {
-            142 => Clocks::DottedWhole,
+            144 => Clocks::DottedWhole,
             96 => Clocks::Whole,
             72 => Clocks::DottedHalf,
             48 => Clocks::Half,
-            32 => Clocks::DottedQuarter,
+            36 => Clocks::DottedQuarter,
             24 => Clocks::Quarter,
             18 => Clocks::DottedEighth,
             12 => Clocks::Eighth,
@@ -60,11 +60,11 @@ impl Clocks {
     // Get the `u8` value represented by the enum.
     pub(crate) fn to_u8(self) -> u8 {
         match self {
-            Clocks::DottedWhole => 142,
+            Clocks::DottedWhole => 144,
             Clocks::Whole => 96,
             Clocks::DottedHalf => 72,
             Clocks::Half => 48,
-            Clocks::DottedQuarter => 32,
+            Clocks::DottedQuarter => 36,
             Clocks::Quarter => 24,
             Clocks::DottedEighth => 18,
             Clocks::Eighth => 12,

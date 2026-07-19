@@ -5,8 +5,8 @@ use std::fmt::{Debug, Display, Formatter};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use utils::{
-    enable_logging, test_file, ADESTE_FIDELES, ALS_DIE_ROEMER, AVE_MARIS_STELLA, BARITONE_SAX,
-    B_GUAJEO, LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO, PITCH_BEND, PITCH_BEND_TWO_BYTES, TOBEFREE,
+    test_file, ADESTE_FIDELES, ALS_DIE_ROEMER, AVE_MARIS_STELLA, BARITONE_SAX, B_GUAJEO,
+    LATER_FOLIA, LOGIC_PRO, PHOBOS_DORICO, PITCH_BEND, PITCH_BEND_TWO_BYTES, TOBEFREE,
 };
 
 type RtResult = std::result::Result<(), RtErr>;
@@ -94,7 +94,6 @@ macro_rules! rtfail {
 
 /// Asserts that a well-formed file can be deserialized then serialized to the exact same bytes.
 fn round_trip_test<S: AsRef<str>>(filename: S) -> RtResult {
-    enable_logging();
     let td = TempDir::new().unwrap();
     let out_path = td.path().join("output.mid");
     let in_path = test_file(&filename);
@@ -190,7 +189,6 @@ impldebug!(BadFileTestError);
 
 /// Asserts that loading a malformed file will return an error.
 fn bad_file_test<S: AsRef<str>>(filename: S) -> BadFileTestResult {
-    enable_logging();
     match MidiFile::load(filename.as_ref()) {
         Ok(_) => Err(BadFileTestError {
             filename: filename.as_ref().into(),

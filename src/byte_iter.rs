@@ -1,8 +1,7 @@
 //! The `byte_iter` module provides a wrapper for iterating over the bytes of a MIDI file.
 
 use crate::core::vlq::{decode_slice, VlqError, CONTINUE};
-use log::trace;
-use snafu::{ensure, OptionExt, ResultExt, Snafu};
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufReader, Bytes, ErrorKind, Read};
 use std::path::{Path, PathBuf};
@@ -24,59 +23,97 @@ pub(crate) struct ByteIter<R: Read> {
     running_status_detected: bool,
 }
 
-#[derive(Debug, Snafu)]
+/// A failure while reading bytes, located by byte position.
+#[derive(Debug)]
 pub(crate) enum ByteError {
-    #[snafu(display("io error around byte {}: {}", position, source))]
     Io {
         position: u64,
         source: std::io::Error,
     },
-
-    #[snafu(display("unexpended end reached around byte {}", position))]
-    End { position: u64 },
-
-    #[snafu(display(
-        "expected string but found non-utf8 encoded bytes around {}: {}",
-        position,
-        source
-    ))]
-    Str { position: u64, source: Utf8Error },
-
-    #[snafu(display(
-        "expected tag '{}' but found '{}' near position {}",
-        expected,
-        found,
-        position
-    ))]
+    End {
+        position: u64,
+    },
+    Str {
+        position: u64,
+        source: Utf8Error,
+    },
     Tag {
         expected: String,
         found: String,
         position: u64,
     },
-
-    #[snafu(display("too many bytes while reading vlq around {}", position))]
-    VlqTooBig { position: u64 },
-
-    #[snafu(display("problem decoding vlq around {}: {}", position, source))]
-    VlqDecode { position: u64, source: VlqError },
-
-    #[snafu(display(
-        "incorrect byte value around {}: expected '{:#X}', found '{:#X}'",
-        position,
-        expected,
-        found,
-    ))]
+    VlqTooBig {
+        position: u64,
+    },
+    VlqDecode {
+        position: u64,
+        source: VlqError,
+    },
     ReadExpect {
         expected: u8,
         found: u8,
         position: u64,
     },
-
-    #[snafu(display("unable to open '{}': {}", path.display(), source,))]
     FileOpen {
         path: PathBuf,
         source: std::io::Error,
     },
+}
+
+impl Display for ByteError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ByteError::Io { position, source } => {
+                write!(f, "io error around byte {}: {}", position, source)
+            }
+            ByteError::End { position } => {
+                write!(f, "unexpected end reached around byte {}", position)
+            }
+            ByteError::Str { position, source } => write!(
+                f,
+                "expected string but found non-utf8 encoded bytes around {}: {}",
+                position, source
+            ),
+            ByteError::Tag {
+                expected,
+                found,
+                position,
+            } => write!(
+                f,
+                "expected tag '{}' but found '{}' near position {}",
+                expected, found, position
+            ),
+            ByteError::VlqTooBig { position } => {
+                write!(f, "too many bytes while reading vlq around {}", position)
+            }
+            ByteError::VlqDecode { position, source } => {
+                write!(f, "problem decoding vlq around {}: {}", position, source)
+            }
+            ByteError::ReadExpect {
+                expected,
+                found,
+                position,
+            } => write!(
+                f,
+                "incorrect byte value around {}: expected '{:#X}', found '{:#X}'",
+                position, expected, found
+            ),
+            ByteError::FileOpen { path, source } => {
+                write!(f, "unable to open '{}': {}", path.display(), source)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ByteError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ByteError::Io { source, .. } | ByteError::FileOpen { source, .. } => Some(source),
+            ByteError::Str { source, .. } => Some(source),
+            ByteError::VlqDecode { source, .. } => Some(source),
+            _ => None,
+        }
+    }
 }
 
 pub(crate) type ByteResult<T> = std::result::Result<T, ByteError>;
@@ -88,7 +125,10 @@ const MB: usize = KB * 1024;
 impl ByteIter<BufReader<File>> {
     pub(crate) fn new_file<P: AsRef<Path>>(path: P) -> ByteResult<Self> {
         let path = path.as_ref();
-        let f = File::open(path).context(FileOpenSnafu { path })?;
+        let f = File::open(path).map_err(|source| ByteError::FileOpen {
+            path: path.to_path_buf(),
+            source,
+        })?;
         let buf = BufReader::with_capacity(MB, f);
         Self::new(buf.bytes())
     }
@@ -112,13 +152,18 @@ impl<R: Read> ByteIter<R> {
         })
     }
 
+    /// The byte offset the iter is currently sitting on.
+    fn pos(&self) -> u64 {
+        self.position.unwrap_or(0)
+    }
+
     fn next_impl(iter: &mut Bytes<R>, position: u64) -> ByteResult<Option<u8>> {
         match iter.next() {
             None => Ok(None),
             Some(result) => match result {
                 Ok(val) => Ok(Some(val)),
                 Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => Ok(None),
-                Err(e) => Err(e).context(IoSnafu { position }),
+                Err(source) => Err(ByteError::Io { position, source }),
             },
         }
     }
@@ -141,80 +186,36 @@ impl<R: Read> ByteIter<R> {
         self.current = self.peek1;
         self.peek1 = self.peek2;
         self.peek2 = self.peek3;
-        let next_opt = self.iter.next();
-        let next_result = match next_opt {
-            None => {
-                self.peek3 = None;
-                trace!(
-                    "read {:#x} at position {}",
-                    return_val.unwrap_or(0),
-                    self.position.unwrap_or(0)
-                );
-                return Ok(return_val);
+        match self.iter.next() {
+            None => self.peek3 = None,
+            Some(Ok(byte)) => self.peek3 = Some(byte),
+            Some(Err(e)) if e.kind() == ErrorKind::UnexpectedEof => self.peek3 = None,
+            Some(Err(source)) => {
+                return Err(ByteError::Io {
+                    position: self.pos(),
+                    source,
+                })
             }
-            Some(r) => r,
-        };
-
-        let e = match next_result {
-            Ok(ok) => {
-                self.peek3 = Some(ok);
-                trace!(
-                    "read {:#x} at position {}",
-                    return_val.unwrap_or(0),
-                    self.position.unwrap_or(0)
-                );
-                return Ok(return_val);
-            }
-            Err(e) => {
-                if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                    self.peek3 = None;
-                    trace!(
-                        "read {:#x} at position {}",
-                        return_val.unwrap_or(0),
-                        self.position.unwrap_or(0)
-                    );
-                    return Ok(return_val);
-                }
-                e
-            }
-        };
-        Err(e).context(IoSnafu {
-            position: self.position.unwrap_or(0),
-        })
+        }
+        Ok(return_val)
     }
 
     pub(crate) fn read_or_die(&mut self) -> ByteResult<u8> {
-        self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })
+        let position = self.pos();
+        self.read()?.ok_or(ByteError::End { position })
     }
 
     pub(crate) fn read2(&mut self) -> ByteResult<[u8; 2]> {
-        let mut retval = [0u8; 2];
-        retval[0] = self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        retval[1] = self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        Ok(retval)
+        Ok([self.read_or_die()?, self.read_or_die()?])
     }
 
     pub(crate) fn read4(&mut self) -> ByteResult<[u8; 4]> {
-        let mut retval = [0u8; 4];
-        retval[0] = self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        retval[1] = self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        retval[2] = self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        retval[3] = self.read()?.context(EndSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        Ok(retval)
+        Ok([
+            self.read_or_die()?,
+            self.read_or_die()?,
+            self.read_or_die()?,
+            self.read_or_die()?,
+        ])
     }
 
     pub(crate) fn read_u16(&mut self) -> ByteResult<u16> {
@@ -233,12 +234,12 @@ impl<R: Read> ByteIter<R> {
         let mut current_byte = CONTINUE;
         let mut byte_count = 0u8;
         while current_byte & CONTINUE == CONTINUE {
-            ensure!(
-                byte_count <= 4,
-                VlqTooBigSnafu {
-                    position: self.position.unwrap_or(0)
-                }
-            );
+            // the spec allows at most four bytes (0x0FFFFFFF)
+            if byte_count >= 4 {
+                return Err(ByteError::VlqTooBig {
+                    position: self.pos(),
+                });
+            }
             current_byte = self.read_or_die()?;
             retval.push(current_byte);
             byte_count += 1;
@@ -248,20 +249,15 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn read_vlq_u32(&mut self) -> ByteResult<u32> {
         let bytes = self.read_vlq_bytes()?;
-        let decoded = decode_slice(&bytes).context(VlqDecodeSnafu {
-            position: self.position.unwrap_or(0),
-        })?;
-        trace!("decoded vlq value {} from {} bytes", decoded, bytes.len());
-        Ok(decoded)
-    }
-
-    pub(crate) fn current(&self) -> Option<u8> {
-        self.current
+        decode_slice(&bytes).map_err(|source| ByteError::VlqDecode {
+            position: self.pos(),
+            source,
+        })
     }
 
     pub(crate) fn peek_or_die(&self) -> ByteResult<u8> {
-        self.peek1.context(EndSnafu {
-            position: self.position.unwrap_or(0),
+        self.peek1.ok_or(ByteError::End {
+            position: self.pos(),
         })
     }
 
@@ -278,17 +274,17 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn expect_tag(&mut self, expected_tag: &str) -> ByteResult<()> {
         let tag_bytes = self.read4()?;
-        let actual_tag = from_utf8(&tag_bytes).context(StrSnafu {
-            position: self.position.unwrap_or(0),
+        let actual_tag = from_utf8(&tag_bytes).map_err(|source| ByteError::Str {
+            position: self.pos(),
+            source,
         })?;
-        ensure!(
-            expected_tag == actual_tag,
-            TagSnafu {
-                expected: expected_tag,
-                found: actual_tag,
-                position: self.position.unwrap_or(0)
-            }
-        );
+        if expected_tag != actual_tag {
+            return Err(ByteError::Tag {
+                expected: expected_tag.to_string(),
+                found: actual_tag.to_string(),
+                position: self.pos(),
+            });
+        }
         Ok(())
     }
 
@@ -304,14 +300,13 @@ impl<R: Read> ByteIter<R> {
 
     pub(crate) fn read_expect(&mut self, expected: u8) -> ByteResult<()> {
         let found = self.read_or_die()?;
-        ensure!(
-            expected == found,
-            ReadExpectSnafu {
+        if expected != found {
+            return Err(ByteError::ReadExpect {
                 expected,
                 found,
-                position: self.position.unwrap_or(0)
-            }
-        );
+                position: self.pos(),
+            });
+        }
         Ok(())
     }
 
@@ -322,6 +317,14 @@ impl<R: Read> ByteIter<R> {
         }
         debug_assert_eq!(num_bytes, bytes.len());
         Ok(bytes)
+    }
+
+    /// Read and discard `num_bytes` bytes.
+    pub(crate) fn skip_n(&mut self, num_bytes: usize) -> ByteResult<()> {
+        for _ in 0..num_bytes {
+            self.read_or_die()?;
+        }
+        Ok(())
     }
 
     pub(crate) fn set_latest_message_byte(&mut self, value: Option<u8>) {
@@ -360,7 +363,7 @@ fn byte_iter_test() {
     assert!(!iter.is_end());
     assert_eq!(0x03, iter.read().unwrap().unwrap());
     assert_eq!(0x04, iter.read().unwrap().unwrap());
-    assert_eq!(0x04, iter.current().unwrap());
+    assert_eq!(0x04, iter.current.unwrap());
     assert!(iter.read().unwrap().is_none());
     iter.clear_size_limit();
     assert_eq!(0x10, iter.read().unwrap().unwrap());

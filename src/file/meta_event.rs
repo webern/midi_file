@@ -1,10 +1,9 @@
 use crate::byte_iter::ByteIter;
 use crate::core::vlq::Vlq;
 use crate::core::{Channel, Clocks, DurationName, PortValue};
-use crate::error::{self, LibResult};
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
-use crate::{Result, Text};
-use snafu::{ensure, OptionExt, ResultExt};
+use crate::Text;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 
@@ -34,7 +33,7 @@ pub enum MetaEvent {
     /// 1 MIDI file, which only contain one sequence, this number should be contained in the first (or only) track. If
     /// transfer of several multitrack sequences is required, this must be done as a group of format 1 files, each with
     /// a different sequence number.
-    SequenceNumber, // TODO - some value here
+    SequenceNumber(u16),
 
     /// `FF 01 len text`: Any amount of text describing anything. It is a good idea to put a text event right at the
     /// beginning of a track, with the name of the track, a description of its intended orchestration, and any other
@@ -143,49 +142,72 @@ pub enum MetaEvent {
     /// System Exclusive, manufacturers who define something using this meta-event should publish it so that others may
     /// know how to use it. After all, this is an interchange format. This type of event may be used by a sequencer
     /// which elects to use this as its only file format; sequencers with their established feature-specific formats
-    /// should probably stick to the standard features when using this format.
-    Sequencer, // TODO - value
+    /// should probably stick to the standard features when using this format. The data bytes,
+    /// beginning with the manufacturer ID, are held raw.
+    Sequencer(Vec<u8>),
 
     /// `FF 0x21 0x01 value`: https://mido.readthedocs.io/en/latest/meta_message_types.html
     Port(PortValue),
+
+    /// Any meta event that this library does not recognize. The spec requires programs to ignore
+    /// meta events they do not know: "programs must properly ignore meta-events which they do not
+    /// recognise, and indeed should expect to see them." The raw bytes are retained so that the
+    /// event can be written back out unaltered.
+    Unknown(UnknownMetaEvent),
 }
 
 impl MetaEvent {
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         iter.read_expect(0xff).context(io!())?;
-        let meta_type_byte = iter.read_or_die().context(io!())?;
-        match meta_type_byte {
-            META_SEQUENCE_NUM => {
-                noimpl!("Sequence Number: https://github.com/webern/midi_file/issues/8")
+        let meta_type = iter.read_or_die().context(io!())?;
+        // the spec says the meta event type byte "is always less than 128"
+        if meta_type >= 0x80 {
+            invalid_file!("meta event type {:#04X} is not less than 128", meta_type);
+        }
+        let length = iter.read_vlq_u32().context(io!())?;
+        // a recognized meta type with a length other than the one the spec gives it is treated as
+        // unrecognized so that its bytes are preserved verbatim rather than misinterpreted.
+        match (meta_type, length) {
+            (META_SEQUENCE_NUM, len) if len == LEN_META_SEQUENCE_NUM as u32 => {
+                Ok(MetaEvent::SequenceNumber(iter.read_u16().context(io!())?))
             }
-            META_TEXT..=META_DEVICE_NAME => MetaEvent::parse_text(iter),
-            META_CHAN_PREFIX => {
-                iter.read_expect(LEN_META_CHAN_PREFIX).context(io!())?;
-                Ok(MetaEvent::MidiChannelPrefix(Channel::new(
-                    iter.read_or_die().context(io!())?,
-                )))
+            (META_TEXT..=META_DEVICE_NAME, _) => MetaEvent::parse_text(iter, meta_type, length),
+            (META_CHAN_PREFIX, len) if len == LEN_META_CHAN_PREFIX as u32 => Ok(
+                MetaEvent::MidiChannelPrefix(Channel::new(iter.read_or_die().context(io!())?)),
+            ),
+            (META_END_OF_TRACK, 0) => Ok(MetaEvent::EndOfTrack),
+            (META_SET_TEMPO, len) if len == LEN_META_SET_TEMPO as u32 => {
+                Ok(MetaEvent::SetTempo(MicrosecondsPerQuarter::parse(iter)?))
             }
-            META_END_OF_TRACK => Ok(MetaEvent::parse_end_of_track(iter)?),
-            META_SET_TEMPO => Ok(MetaEvent::SetTempo(MicrosecondsPerQuarter::parse(iter)?)),
-            META_SMTPE_OFFSET => Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?)),
-            META_TIME_SIG => Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?)),
-            META_KEY_SIG => Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?)),
-            META_SEQ_SPECIFIC => {
-                noimpl!("Sequencer-Specific: https://github.com/webern/midi_file/issues/9")
+            (META_SMTPE_OFFSET, len) if len == LEN_META_SMTPE_OFFSET as u32 => {
+                Ok(MetaEvent::SmpteOffset(SmpteOffsetValue::parse(iter)?))
             }
-            META_PORT => Ok(MetaEvent::Port(PortValue::new({
-                iter.read_expect(1).context(io!())?;
-                iter.read_or_die().context(io!())?
-            }))),
-            _ => invalid_file!("unrecognized byte {:#04X}", meta_type_byte),
+            (META_TIME_SIG, len) if len == LEN_META_TIME_SIG as u32 => {
+                Ok(MetaEvent::TimeSignature(TimeSignatureValue::parse(iter)?))
+            }
+            (META_KEY_SIG, len) if len == LEN_META_KEY_SIG as u32 => {
+                Ok(MetaEvent::KeySignature(KeySignatureValue::parse(iter)?))
+            }
+            (META_SEQ_SPECIFIC, _) => Ok(MetaEvent::Sequencer(
+                iter.read_n(length as usize).context(io!())?,
+            )),
+            (META_PORT, 1) => Ok(MetaEvent::Port(PortValue::new(
+                iter.read_or_die().context(io!())?,
+            ))),
+            _ => {
+                let data = iter.read_n(length as usize).context(io!())?;
+                Ok(MetaEvent::Unknown(UnknownMetaEvent { meta_type, data }))
+            }
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         w.write_all(&[0xff]).context(wr!())?;
         match self {
-            MetaEvent::SequenceNumber => {
-                noimpl!("Sequence Number: https://github.com/webern/midi_file/issues/8")
+            MetaEvent::SequenceNumber(value) => {
+                write_u8!(w, META_SEQUENCE_NUM)?;
+                write_u8!(w, LEN_META_SEQUENCE_NUM)?;
+                w.write_all(&value.to_be_bytes()).context(wr!())
             }
             MetaEvent::OtherText(s) => write_text(w, 0x01, s),
             MetaEvent::Copyright(s) => write_text(w, 0x02, s),
@@ -221,29 +243,27 @@ impl MetaEvent {
             MetaEvent::SmpteOffset(value) => value.write(w),
             MetaEvent::TimeSignature(value) => value.write(w),
             MetaEvent::KeySignature(value) => value.write(w),
-            MetaEvent::Sequencer => {
-                noimpl!("Sequencer-Specific: https://github.com/webern/midi_file/issues/9")
+            MetaEvent::Sequencer(data) => {
+                write_u8!(w, META_SEQ_SPECIFIC)?;
+                let length = u32::try_from(data.len())
+                    .context(ctx!(crate::error::ErrorType::StringTooLong))?;
+                w.write_all(&Vlq::new(length).to_bytes()).context(wr!())?;
+                w.write_all(data).context(wr!())
             }
             MetaEvent::Port(value) => {
                 write_u8!(w, META_PORT)?;
                 write_u8!(w, 1)?;
                 write_u8!(w, value.get())
             }
+            MetaEvent::Unknown(value) => value.write(w),
         }
     }
 
-    pub(crate) fn parse_end_of_track<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        // after 0x2f we should see 0x00
-        iter.read_expect(0x00).context(io!())?;
-        Ok(MetaEvent::EndOfTrack)
-    }
-
-    pub(crate) fn parse_text<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        // we should be on a type-byte with a value between 0x01 and 0x09 (the text range).
-        let text_type = iter
-            .current()
-            .context(error::OtherSnafu { site: site!() })?;
-        let length = iter.read_vlq_u32().context(io!())?;
+    pub(crate) fn parse_text<R: Read>(
+        iter: &mut ByteIter<R>,
+        text_type: u8,
+        length: u32,
+    ) -> Result<Self> {
         let bytes = iter.read_n(length as usize).context(io!())?;
         // the spec does not strictly specify what encoding should be used for strings
         let s: Text = bytes.into();
@@ -262,18 +282,59 @@ impl MetaEvent {
     }
 }
 
-fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> LibResult<()> {
+/// A meta event whose type this library does not recognize, held as raw bytes so that it survives
+/// a read-write roundtrip unaltered. The spec requires readers to tolerate such events. This also
+/// covers the reserved text event types `0x0A` through `0x0F`, which the spec reserves without
+/// assigning a purpose.
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
+pub struct UnknownMetaEvent {
+    /// The meta event type byte, always less than 128.
+    pub(crate) meta_type: u8,
+    /// The data bytes, without the length prefix.
+    pub(crate) data: Vec<u8>,
+}
+
+impl UnknownMetaEvent {
+    /// Create a new `UnknownMetaEvent`. The `meta_type` must be less than 128.
+    pub fn new(meta_type: u8, data: Vec<u8>) -> Result<Self> {
+        ensure!(meta_type < 0x80, ctx!(crate::error::ErrorType::Other));
+        Ok(Self { meta_type, data })
+    }
+
+    /// Getter for the `meta_type` field.
+    pub fn meta_type(&self) -> u8 {
+        self.meta_type
+    }
+
+    /// Getter for the `data` field.
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        write_u8!(w, self.meta_type)?;
+        let length =
+            u32::try_from(self.data.len()).context(ctx!(crate::error::ErrorType::StringTooLong))?;
+        w.write_all(&Vlq::new(length).to_bytes()).context(wr!())?;
+        w.write_all(&self.data).context(wr!())?;
+        Ok(())
+    }
+}
+
+fn write_text<W: Write>(w: &mut Scribe<W>, text_type: u8, text: &Text) -> Result<()> {
     w.write_all(&text_type.to_be_bytes()).context(wr!())?;
     let bytes = text.as_bytes();
     let size_u32 =
-        u32::try_from(bytes.len()).context(error::StringTooLongSnafu { site: site!() })?;
+        u32::try_from(bytes.len()).context(ctx!(crate::error::ErrorType::StringTooLong))?;
     let size = Vlq::new(size_u32).to_bytes();
     w.write_all(&size).context(wr!())?;
     w.write_all(bytes).context(wr!())?;
     Ok(())
 }
 
-// TODO - create some interface for this, constrict it's values, etc.
+/// The value of a [`MetaEvent::SmpteOffset`] event: the SMPTE time at which the track chunk is
+/// supposed to start, as `hr mn se fr ff`.
+// TODO - constrict the values, interpret the hour's SMPTE format bits, etc.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct SmpteOffsetValue {
     // TODO - these are held as raw bytes for now without caring about their meaning or signedness.
@@ -315,9 +376,7 @@ impl SmpteOffsetValue {
         self.ff
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        // after 0x54 we should see 0x05
-        iter.read_expect(LEN_META_SMTPE_OFFSET).context(io!())?;
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         Ok(Self {
             hr: iter.read_or_die().context(io!())?,
             mn: iter.read_or_die().context(io!())?,
@@ -327,7 +386,7 @@ impl SmpteOffsetValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_u8!(w, META_SMTPE_OFFSET)?;
         write_u8!(w, LEN_META_SMTPE_OFFSET)?;
         write_u8!(w, self.hr)?;
@@ -359,7 +418,7 @@ pub(crate) const META_SEQ_SPECIFIC: u8 = 0x7f;
 /// http://www.verycomputer.com/47_f2ad3c41e745127b_1.htm
 pub(crate) const META_PORT: u8 = 0x21;
 
-// #[allow(dead_code)] // TODO - implement
+pub(crate) const LEN_META_SEQUENCE_NUM: u8 = 2;
 pub(crate) const LEN_META_CHAN_PREFIX: u8 = 1;
 pub(crate) const LEN_META_END_OF_TRACK: u8 = 0;
 pub(crate) const LEN_META_SET_TEMPO: u8 = 3;
@@ -411,7 +470,7 @@ pub struct TimeSignatureValue {
 impl TimeSignatureValue {
     /// Create a new `TimeSignatureValue` object.
     pub fn new(numerator: u8, denominator: DurationName, click: Clocks) -> Result<Self> {
-        ensure!(numerator > 0, error::OtherSnafu { site: site!() });
+        ensure!(numerator > 0, ctx!(crate::error::ErrorType::Other));
         Ok(Self {
             numerator,
             denominator,
@@ -435,8 +494,7 @@ impl TimeSignatureValue {
         self.click
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        iter.read_expect(LEN_META_TIME_SIG).context(io!())?;
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         Ok(Self {
             numerator: iter.read_or_die().context(io!())?,
             denominator: DurationName::from_u8(iter.read_or_die().context(io!())?)?,
@@ -445,7 +503,7 @@ impl TimeSignatureValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_u8!(w, META_TIME_SIG)?;
         write_u8!(w, LEN_META_TIME_SIG)?;
         write_u8!(w, self.numerator)?;
@@ -468,13 +526,18 @@ clamp!(
     pub
 );
 
+/// The `mi` byte of a [`MetaEvent::KeySignature`] event: 0 for major, 1 for minor.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum KeyMode {
+    /// `mi = 0`: major key
     #[default]
     Major,
+    /// `mi = 1`: minor key
     Minor,
 }
 
+/// The value of a [`MetaEvent::KeySignature`] event: the number of sharps or flats and whether the
+/// key is major or minor.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct KeySignatureValue {
     accidentals: KeyAccidentals,
@@ -497,8 +560,7 @@ impl KeySignatureValue {
         self.mode
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        iter.read_expect(LEN_META_KEY_SIG).context(io!())?;
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         let raw_accidentals_byte = iter.read_or_die().context(io!())?;
         let casted_accidentals = raw_accidentals_byte as i8;
         Ok(Self {
@@ -510,7 +572,7 @@ impl KeySignatureValue {
         })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         write_u8!(w, META_KEY_SIG)?;
         write_u8!(w, LEN_META_KEY_SIG)?;
         write_u8!(w, self.accidentals.get() as u8)?;
@@ -550,8 +612,7 @@ clamp!(
 );
 
 impl MicrosecondsPerQuarter {
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
-        iter.read_expect(LEN_META_SET_TEMPO).context(io!())?;
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         let bytes = iter.read_n(LEN_META_SET_TEMPO as usize).context(io!())?;
         // bytes is a big-endian u24. fit it into a big-endian u32 then parse it
         let beu32 = [0u8, bytes[0], bytes[1], bytes[2]];

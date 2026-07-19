@@ -1,7 +1,6 @@
-use crate::error::LibResult;
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
 use crate::{Division, Error};
-use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::io::Write;
 
@@ -38,7 +37,7 @@ impl Header {
         self.division
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>, ntracks: u16) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>, ntracks: u16) -> Result<()> {
         // write the header chunk identifier
         write!(w, "MThd").context(wr!())?;
 
@@ -77,12 +76,12 @@ pub enum Format {
 }
 
 impl Format {
-    pub(crate) fn from_u16(value: u16) -> LibResult<Self> {
+    pub(crate) fn from_u16(value: u16) -> Result<Self> {
         match value {
             0 => Ok(Format::Single),
             1 => Ok(Format::Multi),
             2 => Ok(Format::Sequential),
-            _ => crate::error::OtherSnafu { site: site!() }.fail(),
+            _ => ctx!(crate::error::ErrorType::Other)().fail(),
         }
     }
 }
@@ -91,6 +90,6 @@ impl TryFrom<u16> for Format {
     type Error = Error;
 
     fn try_from(value: u16) -> crate::Result<Self> {
-        Ok(Self::from_u16(value)?)
+        Self::from_u16(value)
     }
 }

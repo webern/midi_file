@@ -1,4 +1,4 @@
-use crate::error::LibResult;
+use crate::error::Result;
 use std::convert::TryFrom;
 
 /// Represents the status byte types in Table I "Summary of Status Bytes" from the MIDI
@@ -36,7 +36,7 @@ pub enum StatusType {
 }
 
 impl StatusType {
-    pub(crate) fn from_u8(value: u8) -> LibResult<Self> {
+    pub(crate) fn from_u8(value: u8) -> Result<Self> {
         match value {
             x if StatusType::NoteOff as u8 == x => Ok(StatusType::NoteOff),
             x if StatusType::NoteOn as u8 == x => Ok(StatusType::NoteOn),
@@ -57,6 +57,6 @@ impl TryFrom<u8> for StatusType {
     type Error = crate::Error;
 
     fn try_from(value: u8) -> crate::Result<Self> {
-        Ok(StatusType::from_u8(value)?)
+        StatusType::from_u8(value)
     }
 }

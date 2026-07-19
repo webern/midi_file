@@ -1,5 +1,4 @@
-use crate::error::LibResult;
-use snafu::ResultExt;
+use crate::error::Result;
 use std::io::Write;
 
 #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
@@ -37,7 +36,7 @@ impl<W: Write> Scribe<W> {
 
     /// Write a status byte. If `running_status` is `true`, and the `status` byte is the same as
     /// `previous_status`, then nothing happens.
-    pub(crate) fn write_status_byte(&mut self, status: u8) -> LibResult<()> {
+    pub(crate) fn write_status_byte(&mut self, status: u8) -> Result<()> {
         match self.running_status() {
             Some(previous_status) if previous_status == status => Ok(()),
             _ => {
@@ -64,6 +63,13 @@ impl<W: Write> Scribe<W> {
         if self.use_running_status() {
             self.running_status_byte = Some(value)
         }
+    }
+
+    /// Forget the previously written status byte. The spec says "Sysex events and meta events
+    /// cancel any running status which was in effect", so the next channel message must write its
+    /// status byte even if it matches the one before the meta or sysex event.
+    pub(crate) fn clear_running_status(&mut self) {
+        self.running_status_byte = None;
     }
 
     /// Returns true if the settings are set to use `running_status`.

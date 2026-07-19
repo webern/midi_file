@@ -1,11 +1,9 @@
 use crate::byte_iter::ByteIter;
-use crate::core::vlq::Vlq;
+use crate::core::vlq::{Vlq, MAX_VLQ};
 use crate::core::Message;
-use crate::error::LibResult;
+use crate::error::{Context, Result};
 use crate::file::{MetaEvent, SysexEvent};
 use crate::scribe::Scribe;
-use log::trace;
-use snafu::ResultExt;
 use std::io::{Read, Write};
 
 /// `0xFF`: File Spec: All meta-events begin with FF, then have an event type byte (which is always
@@ -36,31 +34,36 @@ impl Default for Event {
 }
 
 impl Event {
-    fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         let status_byte = iter.peek_or_die().context(io!())?;
         match status_byte {
             FILE_SYSEX_F7 | FILE_SYSEX_F0 => {
+                // sysex and meta events cancel any running status which was in effect
+                iter.set_latest_message_byte(None);
                 Ok(Event::Sysex(SysexEvent::parse(status_byte, iter)?))
             }
             FILE_META_EVENT => {
-                trace!("I peeked at {:#x}, a MetaEvent!", status_byte);
+                // sysex and meta events cancel any running status which was in effect
+                iter.set_latest_message_byte(None);
                 Ok(Event::Meta(MetaEvent::parse(iter)?))
             }
-            _ => {
-                trace!(
-                    "I peeked at {:#x}, neither a SysEx nor a MetaEvent, it must be a MIDI Message!",
-                    status_byte
-                );
-                Ok(Event::Midi(Message::parse(iter)?))
-            }
+            _ => Ok(Event::Midi(Message::parse(iter)?)),
         }
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
         match self {
             Event::Midi(md) => md.write(w),
-            Event::Sysex(sx) => sx.write(w),
-            Event::Meta(mt) => mt.write(w),
+            Event::Sysex(sx) => {
+                // sysex and meta events cancel any running status which was in effect
+                w.clear_running_status();
+                sx.write(w)
+            }
+            Event::Meta(mt) => {
+                // sysex and meta events cancel any running status which was in effect
+                w.clear_running_status();
+                mt.write(w)
+            }
         }
     }
 }
@@ -97,14 +100,17 @@ impl TrackEvent {
         matches!(&self.event, Event::Meta(meta) if matches!(meta, MetaEvent::EndOfTrack))
     }
 
-    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> LibResult<Self> {
+    pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
         let delta_time = iter.read_vlq_u32().context(io!())?;
-        trace!("delta_time {}", delta_time);
         let event = Event::parse(iter)?;
         Ok(Self { delta_time, event })
     }
 
-    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> LibResult<()> {
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        ensure!(
+            self.delta_time <= MAX_VLQ,
+            ctx!(crate::error::ErrorType::VlqTooBig)
+        );
         let delta = Vlq::new(self.delta_time).to_bytes();
         w.write_all(&delta).context(wr!())?;
         self.event.write(w)

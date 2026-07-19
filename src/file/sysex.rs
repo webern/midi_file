@@ -1,11 +1,13 @@
 use crate::byte_iter::ByteIter;
-use crate::error::LibResult;
+use crate::core::vlq::Vlq;
+use crate::error::{Context, Result};
 use crate::scribe::Scribe;
+use std::convert::TryFrom;
 use std::io::{Read, Write};
 
-// TODO - implement sysex messages
-/// Caution: Sysex messages are [not implemented](https://github.com/webern/midi_file/issues/7) and
-/// will error.
+/// A sysex event in a MIDI file: an `F0` or `F7` status byte, a variable-length quantity giving
+/// the number of data bytes, and the data bytes. See [`SysexEventType`] for the meaning of the two
+/// forms.
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
 pub struct SysexEvent {
     t: SysexEventType,
@@ -28,12 +30,26 @@ impl SysexEvent {
         &self.data
     }
 
-    pub(crate) fn parse<R: Read>(_first_byte: u8, _r: &mut ByteIter<R>) -> LibResult<Self> {
-        noimpl!("SysexEvent::parse")
+    pub(crate) fn parse<R: Read>(first_byte: u8, iter: &mut ByteIter<R>) -> Result<Self> {
+        // the caller peeked the status byte; consume it
+        iter.read_expect(first_byte).context(io!())?;
+        let t = match first_byte {
+            0xf0 => SysexEventType::F0,
+            0xf7 => SysexEventType::F7,
+            _ => invalid_file!("invalid sysex status byte {:#04X}", first_byte),
+        };
+        let length = iter.read_vlq_u32().context(io!())?;
+        let data = iter.read_n(length as usize).context(io!())?;
+        Ok(Self { t, data })
     }
 
-    pub(crate) fn write<W: Write>(&self, _w: &mut Scribe<W>) -> LibResult<()> {
-        noimpl!("SysexEvent::write")
+    pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        write_u8!(w, self.t as u8)?;
+        let length =
+            u32::try_from(self.data.len()).context(ctx!(crate::error::ErrorType::StringTooLong))?;
+        w.write_all(&Vlq::new(length).to_bytes()).context(wr!())?;
+        w.write_all(&self.data).context(wr!())?;
+        Ok(())
     }
 }
 
@@ -41,7 +57,7 @@ impl SysexEvent {
 /// packets, or as an "escape" to specify any arbitrary bytes to be transmitted. See Appendix 1 -
 /// MIDI Messages. A normal complete system exclusive message is stored in a MIDI File in this way:
 #[repr(u8)]
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Hash, Default)]
 pub enum SysexEventType {
     /// F0 `<length>` `<bytes to be transmitted after F0>`
     ///
