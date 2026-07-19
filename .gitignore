@@ -1,4 +1,12 @@
 .idea
+.run
+.ignore
 /output
 /target
+.claude/*-cache.json
+.claude/CLAUDE.local.md
+.claude/history.jsonl
+.claude/paste-cache/
 .claude/settings.local.json
+.claude/tmpclaude-*
+CLAUDE.local.md
