@@ -1,6 +1,6 @@
 [package]
 name = "midi_file"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Matthew James Briggs <matthew.james.briggs@gmail.com>"]
 edition = "2018"
 exclude = [
