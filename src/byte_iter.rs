@@ -234,7 +234,8 @@ impl<R: Read> ByteIter<R> {
         let mut current_byte = CONTINUE;
         let mut byte_count = 0u8;
         while current_byte & CONTINUE == CONTINUE {
-            if byte_count > 4 {
+            // the spec allows at most four bytes (0x0FFFFFFF)
+            if byte_count >= 4 {
                 return Err(ByteError::VlqTooBig {
                     position: self.pos(),
                 });

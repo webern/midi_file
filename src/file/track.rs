@@ -47,6 +47,7 @@ impl Track {
     /// Add an event to the end.
     pub fn push_event(&mut self, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32
+        ensure_delta_time(delta_time)?;
         self.events.push(TrackEvent::new(delta_time, event));
         Ok(())
     }
@@ -54,6 +55,7 @@ impl Track {
     /// Add event at `index` and shift everything after it.
     pub fn insert_event(&mut self, index: u32, delta_time: u32, event: Event) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
+        ensure_delta_time(delta_time)?;
         self.events
             .insert(index as usize, TrackEvent::new(delta_time, event));
         Ok(())
@@ -68,6 +70,7 @@ impl Track {
     ) -> crate::Result<()> {
         // TODO check length is not bigger than u32, index is in range, etc
         // std::mem::replace(&mut , TrackEvent{delta_time, event})
+        ensure_delta_time(delta_time)?;
         self.events[index as usize] = TrackEvent::new(delta_time, event);
         Ok(())
     }
@@ -267,6 +270,15 @@ impl Track {
         w.write_all(&track_data).context(wr!())?;
         Ok(())
     }
+}
+
+/// The spec caps a delta time at the largest four-byte variable-length quantity, 0x0FFFFFFF.
+fn ensure_delta_time(delta_time: u32) -> Result<()> {
+    ensure!(
+        delta_time <= crate::core::vlq::MAX_VLQ,
+        ctx!(crate::error::ErrorType::VlqTooBig)
+    );
+    Ok(())
 }
 
 /// If the last item of the track is *not* an end-of-track event, then add it to the back. If

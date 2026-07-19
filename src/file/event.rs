@@ -1,5 +1,5 @@
 use crate::byte_iter::ByteIter;
-use crate::core::vlq::Vlq;
+use crate::core::vlq::{Vlq, MAX_VLQ};
 use crate::core::Message;
 use crate::error::{Context, Result};
 use crate::file::{MetaEvent, SysexEvent};
@@ -93,6 +93,10 @@ impl TrackEvent {
     }
 
     pub(crate) fn write<W: Write>(&self, w: &mut Scribe<W>) -> Result<()> {
+        ensure!(
+            self.delta_time <= MAX_VLQ,
+            ctx!(crate::error::ErrorType::VlqTooBig)
+        );
         let delta = Vlq::new(self.delta_time).to_bytes();
         w.write_all(&delta).context(wr!())?;
         self.event.write(w)

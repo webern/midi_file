@@ -86,6 +86,13 @@ impl Display for VlqError {
 
 impl Error for VlqError {}
 
+/// 0x0FFFFFFF: The spec says "The largest number which is allowed is 0FFFFFFF", i.e. a
+/// variable-length quantity is at most four bytes.
+pub(crate) const MAX_VLQ: u32 = 0x0FFF_FFFF;
+
+/// The maximum number of bytes in a variable-length quantity.
+const MAX_VLQ_BYTES: usize = 4;
+
 /// 0x7f, 127: The largest 7 bit number.
 const MAX_7BIT: u8 = 0b0111_1111;
 
@@ -93,6 +100,7 @@ const MAX_7BIT: u8 = 0b0111_1111;
 pub(crate) const CONTINUE: u8 = 0b1000_0000;
 
 fn encode_u32(mut value: u32) -> Vec<u8> {
+    debug_assert!(value <= MAX_VLQ);
     if value == 0 {
         return vec![0];
     }
@@ -119,6 +127,9 @@ fn encode_u32(mut value: u32) -> Vec<u8> {
 }
 
 pub(crate) fn decode_slice(bytes: &[u8]) -> std::result::Result<u32, VlqError> {
+    if bytes.len() > MAX_VLQ_BYTES {
+        return Err(VlqError::Overflow);
+    }
     let mut result: u32 = 0;
 
     for (i, b) in bytes.iter().enumerate() {
@@ -178,10 +189,10 @@ mod tests {
     }
 
     #[test]
-    fn five_bytes() {
-        test(&[0x81, 0x80, 0x80, 0x80, 0x00], 0x1000_0000);
-        test(&[0x8f, 0xf8, 0x80, 0x80, 0x00], 0xff00_0000);
-        test(&[0x8f, 0xff, 0xff, 0xff, 0x7f], 0xffff_ffff);
+    fn five_bytes_rejected() {
+        // the spec caps a vlq at four bytes / 0x0FFFFFFF
+        error_test(&[0x81, 0x80, 0x80, 0x80, 0x00], VlqError::Overflow);
+        error_test(&[0x8f, 0xff, 0xff, 0xff, 0x7f], VlqError::Overflow);
     }
 
     fn error_test(vlq_bytes: &[u8], x: VlqError) {

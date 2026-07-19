@@ -36,6 +36,25 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/37
+/// Spec 1.1: "The largest number which is allowed is 0FFFFFFF", i.e. a delta-time vlq is at most
+/// four bytes.
+#[test]
+fn vlq_capped_at_four_bytes() {
+    use midi_file::file::{Event, Track};
+    // a five-byte delta-time vlq must be rejected on read
+    let bytes = file_with_track_data(&[
+        0x81, 0x80, 0x80, 0x80, 0x00, // five-byte vlq for 0x10000000
+        0xFF, 0x2F, 0x00, // end of track
+    ]);
+    assert!(MidiFile::read(bytes.as_slice()).is_err());
+
+    // a delta time greater than 0x0FFFFFFF must be rejected on the way in
+    let mut track = Track::default();
+    assert!(track.push_event(0x1000_0000, Event::default()).is_err());
+    assert!(track.push_event(0x0FFF_FFFF, Event::default()).is_ok());
+}
+
 /// https://github.com/webern/midi_file/issues/33
 /// Spec 2.1: bits 14 thru 0 of the division word hold ticks per quarter, so values up to 32767
 /// are valid and must roundtrip unaltered. A zero division must error, not silently become 1.
