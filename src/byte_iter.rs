@@ -323,6 +323,14 @@ impl<R: Read> ByteIter<R> {
         Ok(bytes)
     }
 
+    /// Read and discard `num_bytes` bytes.
+    pub(crate) fn skip_n(&mut self, num_bytes: usize) -> ByteResult<()> {
+        for _ in 0..num_bytes {
+            self.read_or_die()?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn set_latest_message_byte(&mut self, value: Option<u8>) {
         self.latest_message_byte = value;
     }

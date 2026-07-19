@@ -253,13 +253,16 @@ impl MidiFile {
     fn read_inner<R: Read>(mut iter: ByteIter<R>) -> Result<Self> {
         iter.expect_tag("MThd").context(io!())?;
         let chunk_length = iter.read_u32().context(io!())?;
-        // header chunk length is always 6
-        if chunk_length != 6 {
-            return ctx!(crate::error::ErrorType::Other)().fail();
+        // the header data is three 16-bit words. the spec allows the chunk to be longer ("it is
+        // important to read and honour the length, even if it is longer than 6") but never shorter.
+        if chunk_length < 6 {
+            invalid_file!("header chunk length {} is less than 6", chunk_length);
         }
         let format_word = iter.read_u16().context(io!())?;
         let num_tracks = iter.read_u16().context(io!())?;
         let division_data = iter.read_u16().context(io!())?;
+        // ignore any header data beyond the six bytes we know about
+        iter.skip_n((chunk_length - 6) as usize).context(io!())?;
         let format = Format::from_u16(format_word)?;
         let header = Header::new(format, Division::from_u16(division_data)?);
         let mut tracks = Vec::new();

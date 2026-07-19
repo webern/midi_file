@@ -36,6 +36,34 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/31
+/// Spec 2.2: "it is important to read and honour the length, even if it is longer than 6."
+#[test]
+fn header_longer_than_six_bytes() {
+    let bytes: Vec<u8> = vec![
+        0x4D, 0x54, 0x68, 0x64, // MThd
+        0x00, 0x00, 0x00, 0x08, // length 8
+        0x00, 0x00, // format 0
+        0x00, 0x01, // one track
+        0x00, 0x60, // division 96
+        0xAB, 0xCD, // two extra header bytes to be ignored
+        0x4D, 0x54, 0x72, 0x6B, // MTrk
+        0x00, 0x00, 0x00, 0x04, // length 4
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ];
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    assert_eq!(1, mf.tracks_len());
+
+    // a length shorter than 6 remains invalid
+    let bytes: Vec<u8> = vec![
+        0x4D, 0x54, 0x68, 0x64, // MThd
+        0x00, 0x00, 0x00, 0x04, // length 4
+        0x00, 0x00, // format 0
+        0x00, 0x01, // one track
+    ];
+    assert!(MidiFile::read(bytes.as_slice()).is_err());
+}
+
 /// https://github.com/webern/midi_file/issues/37
 /// Spec 1.1: "The largest number which is allowed is 0FFFFFFF", i.e. a delta-time vlq is at most
 /// four bytes.
