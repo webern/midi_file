@@ -11,7 +11,7 @@ exclude = [
     "examples/",
     "tests/",
 ]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 readme = "README.md"
 description = "For reading and writing MIDI files."
 repository = "https://github.com/webern/midi_file"

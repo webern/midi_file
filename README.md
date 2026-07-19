@@ -3,16 +3,10 @@
 The purpose of this library is primarily to be able to author and write MIDI files in Rust. The
 library also parses MIDI files and thus can "round trip" files.
 
-### Unimplemented Features
-
-- `sysex` messages
-- sequence number messages
-- sequencer specific messages
-
 ### Interface
 
 All the bytes, messages and such are represented with pub structs and enums, but the structs have
-private members. To create a basic file, as I have done in an [example][], I have added functions at
+private members. To create a basic file, as I have done in an [example], I have added functions at
 the `Track` level. With these functions you can build up a file without as much knowledge of the
 underlying data structure.
 
