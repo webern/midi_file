@@ -73,7 +73,6 @@ impl TryInto<u8> for Vlq {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum VlqError {
-    // TODO - implement incomplete number check
     IncompleteNumber,
     Overflow,
 }

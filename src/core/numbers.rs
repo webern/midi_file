@@ -66,7 +66,7 @@ clamp!(
 
 clamp!(
     /// The [port](http://midi.teragonaudio.com/tech/midifile/obsolete.htm) number. The minimum
-    /// value is `0`, maximum value is `255` (i.e. `u7`). The default value is `0`.
+    /// value is `0`, maximum value is `127` (i.e. `u7`). The default value is `0`.
     PortValue,
     u8,
     0,
