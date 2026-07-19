@@ -5,12 +5,13 @@ use std::convert::TryFrom;
 use std::io::Write;
 
 clamp!(
-    /// The allowable values for [`Division`] when using the quarter note method. It is a positive
-    /// `u14` and thus has the range 1 to 16,383. The default value is 1024.
+    /// The allowable values for [`Division`] when using the quarter note method. The spec gives it
+    /// bits 14 thru 0 of the division word, so it is a positive 15-bit value with the range 1 to
+    /// 32,767. The default value is 1024.
     QuarterNoteDivision,
     u16,
     1,
-    16383,
+    32767,
     1024,
     pub
 );
@@ -42,6 +43,9 @@ impl Division {
             // TODO - implement SMPTE division
             ctx!(crate::error::ErrorType::Other)().fail()
         } else {
+            // never silently alter the value: zero ticks-per-quarter is the only in-format value
+            // that QuarterNoteDivision cannot represent, and it is meaningless, so error.
+            ensure!(value != 0, ctx!(crate::error::ErrorType::Other));
             Ok(Division::QuarterNote(QuarterNoteDivision::new(value)))
         }
     }

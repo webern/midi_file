@@ -18,6 +18,46 @@ fn file_with_track_data(track_data: &[u8]) -> Vec<u8> {
     bytes
 }
 
+/// Builds a MIDI file as bytes: a format 0 header with the given division word followed by a
+/// single empty track.
+fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
+    let mut bytes: Vec<u8> = vec![
+        0x4D, 0x54, 0x68, 0x64, // MThd
+        0x00, 0x00, 0x00, 0x06, // length 6
+        0x00, 0x00, // format 0
+        0x00, 0x01, // one track
+    ];
+    bytes.extend_from_slice(division);
+    bytes.extend_from_slice(&[
+        0x4D, 0x54, 0x72, 0x6B, // MTrk
+        0x00, 0x00, 0x00, 0x04, // length 4
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    bytes
+}
+
+/// https://github.com/webern/midi_file/issues/33
+/// Spec 2.1: bits 14 thru 0 of the division word hold ticks per quarter, so values up to 32767
+/// are valid and must roundtrip unaltered. A zero division must error, not silently become 1.
+#[test]
+fn division_full_15_bit_range() {
+    use midi_file::file::Division;
+    // division 20000 (0x4E20)
+    let bytes = file_with_division(&[0x4E, 0x20]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    match mf.header().division() {
+        Division::QuarterNote(q) => assert_eq!(20000, q.get()),
+        d => panic!("wrong division {:?}", d),
+    }
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+
+    // division 0 is meaningless and must error
+    let bytes = file_with_division(&[0x00, 0x00]);
+    assert!(MidiFile::read(bytes.as_slice()).is_err());
+}
+
 /// https://github.com/webern/midi_file/issues/34
 /// Spec 2.1: ntrks "will always be 1 for a format 0 file."
 #[test]
