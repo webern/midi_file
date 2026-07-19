@@ -36,6 +36,39 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/7
+/// Spec 2.3: F0 and F7 sysex events. The spec's example: the transmitted message
+/// F0 43 12 00 07 F7 is stored as F0 05 43 12 00 07 F7.
+#[test]
+fn sysex_events() {
+    use midi_file::file::{Event, SysexEventType};
+    let bytes = file_with_track_data(&[
+        0x00, 0xF0, 0x05, 0x43, 0x12, 0x00, 0x07, 0xF7, // complete sysex message
+        0x00, 0xF7, 0x03, 0x43, 0x12, 0x00, // F7 escape / continuation packet
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ]);
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    let track = mf.tracks().next().unwrap();
+    let mut events = track.events();
+    match events.next().unwrap().event() {
+        Event::Sysex(sx) => {
+            assert_eq!(SysexEventType::F0, *sx.sysex_type());
+            assert_eq!(&[0x43, 0x12, 0x00, 0x07, 0xF7], sx.data());
+        }
+        e => panic!("wrong event {:?}", e),
+    }
+    match events.next().unwrap().event() {
+        Event::Sysex(sx) => {
+            assert_eq!(SysexEventType::F7, *sx.sysex_type());
+            assert_eq!(&[0x43, 0x12, 0x00], sx.data());
+        }
+        e => panic!("wrong event {:?}", e),
+    }
+    let mut out: Vec<u8> = Vec::new();
+    mf.write(&mut out).unwrap();
+    assert_eq!(bytes, out);
+}
+
 /// https://github.com/webern/midi_file/issues/9
 /// Spec 3.1: FF 7F len data Sequencer Specific Meta-Event.
 #[test]
