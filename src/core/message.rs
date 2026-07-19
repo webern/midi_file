@@ -394,7 +394,7 @@ impl Message {
                 noimpl!("channel pressure: https://github.com/webern/midi_file/issues/X")
             }
             StatusType::PitchBend => {
-                let value = iter.read_u16().context(io!()).unwrap();
+                let value = iter.read_u16().context(io!())?;
                 let decoded = decode_14_bit_number(value);
                 Ok(Message::PitchBend(PitchBendMessage {
                     channel,
