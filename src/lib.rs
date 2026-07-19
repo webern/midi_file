@@ -267,7 +267,17 @@ impl MidiFile {
         let header = Header::new(format, Division::from_u16(division_data)?);
         let mut tracks = Vec::new();
         for _ in 0..num_tracks {
-            tracks.push(Track::parse(&mut iter)?)
+            // the spec says programs should expect alien chunks and "treat them as if they weren't
+            // there", so skip any chunk that is not an MTrk.
+            loop {
+                let tag = iter.read4().context(io!())?;
+                if &tag == b"MTrk" {
+                    tracks.push(Track::parse(&mut iter)?);
+                    break;
+                }
+                let chunk_length = iter.read_u32().context(io!())?;
+                iter.skip_n(chunk_length as usize).context(io!())?;
+            }
         }
         Ok(Self {
             running_status: iter.is_running_status_detected(),

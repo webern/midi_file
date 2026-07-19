@@ -222,8 +222,9 @@ impl Track {
         Ok(())
     }
 
+    /// Parse a track chunk. The caller has already consumed the `MTrk` tag; parsing starts at the
+    /// chunk length.
     pub(crate) fn parse<R: Read>(iter: &mut ByteIter<R>) -> Result<Self> {
-        iter.expect_tag("MTrk").context(io!())?;
         let chunk_length = iter.read_u32().context(io!())?;
         iter.set_size_limit(chunk_length as u64);
         let mut events = Vec::new();

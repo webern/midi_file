@@ -36,6 +36,27 @@ fn file_with_division(division: &[u8; 2]) -> Vec<u8> {
     bytes
 }
 
+/// https://github.com/webern/midi_file/issues/32
+/// Spec 1.3: "Your programs should EXPECT alien chunks and treat them as if they weren't there."
+#[test]
+fn alien_chunks_are_skipped() {
+    let bytes: Vec<u8> = vec![
+        0x4D, 0x54, 0x68, 0x64, // MThd
+        0x00, 0x00, 0x00, 0x06, // length 6
+        0x00, 0x00, // format 0
+        0x00, 0x01, // one track
+        0x00, 0x60, // division 96
+        0x58, 0x46, 0x49, 0x48, // alien chunk "XFIH"
+        0x00, 0x00, 0x00, 0x02, // length 2
+        0x01, 0x02, // alien data
+        0x4D, 0x54, 0x72, 0x6B, // MTrk
+        0x00, 0x00, 0x00, 0x04, // length 4
+        0x00, 0xFF, 0x2F, 0x00, // end of track
+    ];
+    let mf = MidiFile::read(bytes.as_slice()).unwrap();
+    assert_eq!(1, mf.tracks_len());
+}
+
 /// https://github.com/webern/midi_file/issues/31
 /// Spec 2.2: "it is important to read and honour the length, even if it is longer than 6."
 #[test]
